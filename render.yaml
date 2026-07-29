@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: extreme-frontier
+    env: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+    disk:
+      name: game-data
+      mountPath: /opt/render/project/src/server
+      sizeGB: 1
