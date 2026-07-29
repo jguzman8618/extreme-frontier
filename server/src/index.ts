@@ -14,9 +14,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// In production the client is built into server/public and served
-// from this same process, so the whole game is one URL/one host —
-// which is what a Discord Activity needs.
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const hasClientBuild = fs.existsSync(path.join(PUBLIC_DIR, 'index.html'));
 if (hasClientBuild) {
@@ -25,8 +22,6 @@ if (hasClientBuild) {
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
-
-// ---------- helpers ----------
 
 function getPlayerById(id: string): PlayerRow | undefined {
   return db.prepare('SELECT * FROM players WHERE id = ?').get(id) as PlayerRow | undefined;
@@ -72,24 +67,22 @@ function inBounds(x: number, y: number) {
   return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < MAP_SIZE && y < MAP_SIZE;
 }
 
-// ---------- auth (dev-only stand-in for Discord OAuth) ----------
-// Player id doubles as the bearer token for now. Swap this for real
-// Discord OAuth + signed sessions before this goes anywhere public.
-
 app.post('/api/login', (req: Request, res: Response) => {
   const { username } = req.body ?? {};
   if (!username || typeof username !== 'string' || username.trim().length < 2) {
     return res.status(400).json({ error: 'username required (min 2 chars)' });
   }
-  const clean = username.trim().slice(0, 24);
+  const clean = username.trim().slice(0, 20);
 
-  let player = db.prepare('SELECT * FROM players WHERE username = ?').get(clean) as PlayerRow | undefined;
-  if (!player) {
-    const id = randomUUID();
-    db.prepare('INSERT INTO players (id, username, money, created_at) VALUES (?, ?, ?, ?)')
-      .run(id, clean, STARTING_MONEY, Date.now());
-    player = getPlayerById(id)!;
+  const existing = db.prepare('SELECT 1 FROM players WHERE username = ?').get(clean);
+  if (existing) {
+    return res.status(409).json({ error: 'that username is already taken' });
   }
+
+  const id = randomUUID();
+  db.prepare('INSERT INTO players (id, username, money, created_at) VALUES (?, ?, ?, ?)')
+    .run(id, clean, STARTING_MONEY, Date.now());
+  const player = getPlayerById(id)!;
   res.json({ token: player.id, player });
 });
 
@@ -101,13 +94,6 @@ function authMiddleware(req: Request, res: Response, next: NextFunction) {
   (req as any).player = player as PlayerRow;
   next();
 }
-
-// ---------- Discord Activity auth ----------
-// 1. Client gets a short-lived `code` from the Discord SDK.
-// 2. We exchange it here for an access token (needs the client secret,
-//    which must never be sent to the browser).
-// 3. Client calls /api/login/discord with that access token; we look up
-//    the Discord user and issue our own session token, same as dev login.
 
 app.post('/api/discord/token', async (req: Request, res: Response) => {
   const { code } = req.body ?? {};
@@ -155,8 +141,6 @@ app.post('/api/login/discord', async (req: Request, res: Response) => {
     let player = db.prepare('SELECT * FROM players WHERE discord_id = ?').get(me.id) as PlayerRow | undefined;
     if (!player) {
       const id = randomUUID();
-      // Discord usernames can collide with existing dev-login usernames;
-      // suffix to keep the UNIQUE constraint on username happy.
       const baseName = (me.username as string).slice(0, 20);
       let candidate = baseName;
       let n = 1;
@@ -173,10 +157,6 @@ app.post('/api/login/discord', async (req: Request, res: Response) => {
     res.status(502).json({ error: 'discord user lookup failed' });
   }
 });
-
-
-
-// ---------- game state ----------
 
 app.get('/api/state', authMiddleware, (req: Request, res: Response) => {
   const player = (req as any).player as PlayerRow;
@@ -282,9 +262,6 @@ io.on('connection', (socket) => {
   socket.emit('hello', { message: 'connected' });
 });
 
-// Catch-all: any non-API route serves the client's index.html so
-// client-side routing (and Discord's iframe load) works. Must be
-// registered after every /api route above.
 if (hasClientBuild) {
   app.get('*', (req: Request, res: Response) => {
     if (req.path.startsWith('/api')) return res.status(404).json({ error: 'not found' });
