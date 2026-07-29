@@ -48,8 +48,22 @@ db.exec(`
     PRIMARY KEY (x, y)
   );
 
+  CREATE TABLE IF NOT EXISTS livestock (
+    x INTEGER NOT NULL,
+    y INTEGER NOT NULL,
+    plot_id TEXT NOT NULL,
+    owner_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    last_collected_at INTEGER NOT NULL,
+    PRIMARY KEY (x, y)
+  );
+
+  -- Resource nodes carry their CURRENT position here (they relocate on
+  -- depletion), seeded from world.ts config the first time each is used.
   CREATE TABLE IF NOT EXISTS resource_state (
     node_id TEXT PRIMARY KEY,
+    x INTEGER NOT NULL,
+    y INTEGER NOT NULL,
     depleted_until INTEGER NOT NULL DEFAULT 0
   );
 `);

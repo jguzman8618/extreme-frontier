@@ -3,16 +3,22 @@ import { io, Socket } from 'socket.io-client';
 import {
   API_BASE, WorldConfig, GameState, PlotConfig,
   login, loginWithDiscord, getWorld, getState,
-  move, gather, claimPlot, nameFarm, buildBuilding, plantCrop, harvestCrop, sellToShop, craftItem,
+  move, gather, claimPlot, nameFarm, buildBuilding, plantCrop, harvestCrop,
+  sellToShop, craftItem, buyLivestock, collectLivestock,
 } from './api';
 import { authenticateWithDiscord, isInsideDiscord } from './discord';
 import { TradeInvitePrompt, TradeModal, TradeSessionState } from './TradeModal';
 
-const ITEM_ICON: Record<string, string> = { wood: '🪵', stone: '🪨' };
+const ITEM_ICON: Record<string, string> = {
+  wood: '🪵', stone: '🪨', coin: '🪙',
+  egg: '🥚', wool: '🧶', milk: '🥛',
+};
 
-function ItemIcon({ item }: { item: string }) {
-  if (item === 'globcoin') return <img src="/glob-coin.png" alt="Glob Coin" className="coin-icon" />;
-  return <span>{ITEM_ICON[item] ?? '📦'}</span>;
+function itemIconFor(item: string, world: WorldConfig | null): string {
+  if (ITEM_ICON[item]) return ITEM_ICON[item];
+  if (world?.crops[item]) return world.crops[item].icon;
+  if (world?.craftRecipes[item]) return world.craftRecipes[item].icon;
+  return '📦';
 }
 
 function chebyshev(ax: number, ay: number, bx: number, by: number) {
@@ -29,6 +35,14 @@ function isCropReady(crop: { cropType: string; plantedAt: number }, world: World
   return Date.now() - crop.plantedAt >= cfg.growTimeMs;
 }
 
+function isLivestockReady(animal: { type: string; lastCollectedAt: number }, world: WorldConfig): boolean {
+  const cfg = world.livestock[animal.type];
+  if (!cfg) return false;
+  return Date.now() - animal.lastCollectedAt >= cfg.produceTimeMs;
+}
+
+const CELL_PX = 18;
+
 export default function App() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('owf_token'));
   const [world, setWorld] = useState<WorldConfig | null>(null);
@@ -44,7 +58,6 @@ export default function App() {
   const [tradeMessage, setTradeMessage] = useState<string | null>(null);
   const [pendingInviteTo, setPendingInviteTo] = useState<string | null>(null);
 
-  // Discord auto-auth
   useEffect(() => {
     if (!inDiscord || token) return;
     authenticateWithDiscord()
@@ -54,18 +67,15 @@ export default function App() {
       .finally(() => setDiscordAuthing(false));
   }, [inDiscord, token]);
 
-  // tick for live countdowns
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
   }, []);
 
-  // load world config once
   useEffect(() => {
     getWorld().then(setWorld).catch((e) => setError(e.message));
   }, []);
 
-  // load player state once we have a token
   useEffect(() => {
     if (!token) return;
     getState(token)
@@ -77,7 +87,6 @@ export default function App() {
       });
   }, [token]);
 
-  // socket connection + all live events
   useEffect(() => {
     if (!token) return;
     const s: Socket = io(API_BASE || undefined);
@@ -101,11 +110,11 @@ export default function App() {
       });
     });
 
-    s.on('resourceUpdate', ({ id, depletedUntil }: { id: string; depletedUntil: number }) => {
+    s.on('resourceUpdate', ({ id, x, y, depletedUntil }: { id: string; x: number; y: number; depletedUntil: number }) => {
       setState((prev) => {
         if (!prev) return prev;
         const resourceNodes = prev.resourceNodes.map((n) =>
-          n.id === id ? { ...n, depletedUntil, available: depletedUntil <= Date.now() } : n
+          n.id === id ? { ...n, x, y, depletedUntil, available: depletedUntil <= Date.now() } : n
         );
         return { ...prev, resourceNodes };
       });
@@ -129,6 +138,18 @@ export default function App() {
           ...prev,
           crops: [...prev.crops.filter((cr) => !(cr.x === c.x && cr.y === c.y)),
             { x: c.x, y: c.y, ownerId: c.ownerId!, cropType: c.cropType!, plantedAt: c.plantedAt!, ready: false }],
+        };
+      });
+    });
+
+    s.on('livestockUpdate', (l: { x: number; y: number; ownerId?: string; type?: string; lastCollectedAt?: number; removed: boolean }) => {
+      setState((prev) => {
+        if (!prev) return prev;
+        if (l.removed) return { ...prev, livestock: prev.livestock.filter((a) => !(a.x === l.x && a.y === l.y)) };
+        return {
+          ...prev,
+          livestock: [...prev.livestock.filter((a) => !(a.x === l.x && a.y === l.y)),
+            { x: l.x, y: l.y, ownerId: l.ownerId!, type: l.type!, lastCollectedAt: l.lastCollectedAt!, ready: false }],
         };
       });
     });
@@ -160,7 +181,6 @@ export default function App() {
     return () => { s.disconnect(); };
   }, [token]);
 
-  // movement via arrow keys / WASD
   useEffect(() => {
     if (!token || !state || !world) return;
     function onKeyDown(e: KeyboardEvent) {
@@ -186,7 +206,7 @@ export default function App() {
 
   const handleClaim = useCallback((plotId: string) => {
     if (!token) return;
-    claimPlot(token, plotId).catch((e) => setError(e.message));
+    claimPlot(token, plotId).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => setError(e.message));
   }, [token]);
 
   const handleBuild = useCallback((x: number, y: number, type: string) => {
@@ -217,6 +237,16 @@ export default function App() {
   const handleNameFarm = useCallback((plotId: string, name: string) => {
     if (!token) return;
     nameFarm(token, plotId, name).catch((e) => setError(e.message));
+  }, [token]);
+
+  const handleBuyLivestock = useCallback((x: number, y: number, type: string) => {
+    if (!token) return;
+    buyLivestock(token, x, y, type).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => setError(e.message));
+  }, [token]);
+
+  const handleCollectLivestock = useCallback((x: number, y: number) => {
+    if (!token) return;
+    collectLivestock(token, x, y).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => setError(e.message));
   }, [token]);
 
   function requestTrade(targetId: string) {
@@ -261,6 +291,9 @@ export default function App() {
   }
 
   const me = state.player;
+  function ItemIcon({ item }: { item: string }) {
+    return <span>{itemIconFor(item, world)}</span>;
+  }
   const here = { x: me.x, y: me.y };
   const occupyingPlot = plotAtClient(world, here.x, here.y);
   const plotOwner = occupyingPlot ? state.plotOwners[occupyingPlot.id] : undefined;
@@ -268,9 +301,16 @@ export default function App() {
   const isUnclaimed = !!occupyingPlot && !plotOwner;
   const buildingHere = state.buildings.find((b) => b.x === here.x && b.y === here.y);
   const cropHere = state.crops.find((c) => c.x === here.x && c.y === here.y);
+  const livestockHere = state.livestock.find((a) => a.x === here.x && a.y === here.y);
   const nearbyNodes = state.resourceNodes.filter((n) => chebyshev(here.x, here.y, n.x, n.y) <= 1);
   const nearbyPlayers = state.players.filter((p) => p.id !== me.id && chebyshev(here.x, here.y, p.x, p.y) <= 1);
   const nearShop = chebyshev(here.x, here.y, world.shopLocation.x, world.shopLocation.y) <= 1;
+
+  const myPlotIds = Object.entries(state.plotOwners).filter(([, o]) => o.ownerId === me.id).map(([id]) => id);
+  const hasCabin = !!occupyingPlot && state.buildings.some((b) => b.plot_id === occupyingPlot.id && b.type === 'cabin');
+  const hasShed = !!occupyingPlot && state.buildings.some((b) => b.plot_id === occupyingPlot.id && b.type === 'shed');
+  const hasBarn = !!occupyingPlot && state.buildings.some((b) => b.plot_id === occupyingPlot.id && b.type === 'barn');
+  const tileFree = !buildingHere && !cropHere && !livestockHere;
 
   return (
     <div className="app">
@@ -278,8 +318,11 @@ export default function App() {
         <h1>🤠 Extreme Frontier</h1>
         <div className="stats">
           <span className="username">{me.username}</span>
-          {Object.entries(state.inventory).map(([item, qty]) => (
-            <span key={item} className="inv-pill"><ItemIcon item={item} /> {qty}</span>))}
+          {Object.entries(state.inventory)
+            .filter(([, qty]) => qty > 0)
+            .map(([item, qty]) => (
+              <span key={item} className="inv-pill"><ItemIcon item={item} /> {qty}</span>
+            ))}
         </div>
       </header>
 
@@ -291,7 +334,7 @@ export default function App() {
       <div className="game-layout">
         <div
           className="map-grid"
-          style={{ gridTemplateColumns: `repeat(${world.mapW}, 28px)`, gridTemplateRows: `repeat(${world.mapH}, 28px)` }}
+          style={{ gridTemplateColumns: `repeat(${world.mapW}, ${CELL_PX}px)`, gridTemplateRows: `repeat(${world.mapH}, ${CELL_PX}px)` }}
         >
           {world.terrain.map((row, y) =>
             row.map((terrain, x) => {
@@ -299,6 +342,7 @@ export default function App() {
               const owner = plot ? state.plotOwners[plot.id] : undefined;
               const building = state.buildings.find((b) => b.x === x && b.y === y);
               const crop = state.crops.find((c) => c.x === x && c.y === y);
+              const animal = state.livestock.find((a) => a.x === x && a.y === y);
               const node = state.resourceNodes.find((n) => n.x === x && n.y === y);
               const playersHere = state.players.filter((p) => p.x === x && p.y === y);
 
@@ -314,6 +358,7 @@ export default function App() {
               let content: string | null = null;
               if (x === world.shopLocation.x && y === world.shopLocation.y) content = '🏪';
               else if (building) content = world.buildings[building.type]?.icon ?? '🏗️';
+              else if (animal) content = world.livestock[animal.type]?.icon ?? '🐾';
               else if (crop) content = world.crops[crop.cropType]?.icon ?? '🌱';
               else if (node) {
                 const nodeAvailable = node.depletedUntil <= Date.now();
@@ -339,11 +384,14 @@ export default function App() {
           {isUnclaimed && occupyingPlot && (
             <button
               className="crop-option"
-              disabled={(state.inventory.globcoin ?? 0) < world.homesteadCost}
+              disabled={(state.inventory.coin ?? 0) < world.homesteadCost || myPlotIds.length >= world.maxHomesteads}
               onClick={() => handleClaim(occupyingPlot.id)}
             >
-              🏡 Claim this homestead — {world.homesteadCost} <ItemIcon item="globcoin" />
+              🏡 Claim this homestead — {world.homesteadCost} <ItemIcon item="coin" />
             </button>
+          )}
+          {isUnclaimed && myPlotIds.length >= world.maxHomesteads && (
+            <p className="modal-note">You already own the max of {world.maxHomesteads} homesteads.</p>
           )}
           {occupyingPlot && plotOwner && (
             <p className="modal-note">
@@ -355,7 +403,12 @@ export default function App() {
           {isMyPlot && occupyingPlot && (
             <FarmNameForm currentName={plotOwner?.farmName ?? null} onSave={(name) => handleNameFarm(occupyingPlot.id, name)} />
           )}
+          {isMyPlot && !hasCabin && (
+            <p className="modal-note">⚠️ Build a Cabin here first — nothing else works on this homestead without one.</p>
+          )}
+
           {buildingHere && <p className="modal-note">{world.buildings[buildingHere.type]?.icon} {world.buildings[buildingHere.type]?.name}</p>}
+
           {cropHere && (
             isCropReady(cropHere, world)
               ? <button className="crop-option" onClick={() => handleHarvest(here.x, here.y)}>
@@ -364,25 +417,56 @@ export default function App() {
               : <p className="modal-note">Growing {world.crops[cropHere.cropType]?.name}… ready in {Math.max(0, Math.ceil((world.crops[cropHere.cropType].growTimeMs - (Date.now() - cropHere.plantedAt)) / 1000))}s</p>
           )}
 
-          {isMyPlot && !buildingHere && !cropHere && (
+          {livestockHere && (
+            isLivestockReady(livestockHere, world)
+              ? <button className="crop-option" onClick={() => handleCollectLivestock(here.x, here.y)}>
+                  {world.livestock[livestockHere.type]?.produceIcon} Collect {world.livestock[livestockHere.type]?.produceItem} from {world.livestock[livestockHere.type]?.name}
+                </button>
+              : <p className="modal-note">{world.livestock[livestockHere.type]?.icon} {world.livestock[livestockHere.type]?.name} — produce ready in {Math.max(0, Math.ceil((world.livestock[livestockHere.type].produceTimeMs - (Date.now() - livestockHere.lastCollectedAt)) / 1000))}s</p>
+          )}
+
+          {isMyPlot && tileFree && (
             <>
               <h4>Build</h4>
               {Object.values(world.buildings).map((b) => {
                 const affordable = Object.entries(b.cost).every(([item, qty]) => (state.inventory[item] ?? 0) >= (qty as number));
+                const locked = b.id !== 'cabin' && !hasCabin;
                 return (
-                  <button key={b.id} className="crop-option" disabled={!affordable} onClick={() => handleBuild(here.x, here.y, b.id)}>
+                  <button key={b.id} className="crop-option" disabled={!affordable || locked} onClick={() => handleBuild(here.x, here.y, b.id)}>
                     {b.icon} {b.name} — {Object.entries(b.cost).map(([i, q]) => `${q} ${i}`).join(', ')}
+                    {locked && ' (needs Cabin)'}
                   </button>
                 );
               })}
-              <h4>Plant</h4>
-              {Object.values(world.crops).map((c) => (
+
+              <h4>Plant {!hasShed && '(needs Shed)'}</h4>
+              {hasCabin && hasShed && Object.values(world.crops).map((c) => (
                 <button key={c.id} className="crop-option" onClick={() => handlePlant(here.x, here.y, c.id)}>
                   {c.icon} {c.name} — grows {Math.round(c.growTimeMs / 1000)}s, yields {c.yieldAmount}
                 </button>
               ))}
+
+              <h4>Livestock {!hasBarn && '(needs Barn)'}</h4>
+              {hasCabin && hasBarn && Object.values(world.livestock).map((l) => {
+                const affordable = (state.inventory.coin ?? 0) >= l.cost;
+                return (
+                  <button key={l.id} className="crop-option" disabled={!affordable} onClick={() => handleBuyLivestock(here.x, here.y, l.id)}>
+                    {l.icon} {l.name} — {l.cost} <ItemIcon item="coin" /> (produces {l.produceIcon} {l.produceItem})
+                  </button>
+                );
+              })}
             </>
           )}
+
+          <h4>🔨 Craft</h4>
+          {Object.values(world.craftRecipes).map((r) => {
+            const affordable = Object.entries(r.inputs).every(([item, qty]) => (state.inventory[item] ?? 0) >= (qty as number));
+            return (
+              <button key={r.id} className="crop-option" disabled={!affordable} onClick={() => handleCraft(r.id)}>
+                {r.icon} {r.name} — needs {Object.entries(r.inputs).map(([i, q]) => `${q} ${i}`).join(', ')} → {r.outputQty}x
+              </button>
+            );
+          })}
 
           {nearbyNodes.length > 0 && (
             <>
@@ -414,29 +498,19 @@ export default function App() {
             </>
           )}
 
-          <h4>🔨 Craft</h4>
-          {Object.values(world.craftRecipes).map((r) => {
-            const affordable = Object.entries(r.inputs).every(([item, qty]) => (state.inventory[item] ?? 0) >= (qty as number));
-            return (
-              <button key={r.id} className="crop-option" disabled={!affordable} onClick={() => handleCraft(r.id)}>
-                {r.icon} {r.name} — needs {Object.entries(r.inputs).map(([i, q]) => `${q} ${i}`).join(', ')} → {r.outputQty}x
-              </button>
-            );
-          })}
-
           {nearShop && (
             <>
               <h4>🏪 General Store</h4>
-              <p className="modal-note">Sell goods for Glob Coins.</p>
+              <p className="modal-note">Sell crafted goods for coins.</p>
               {Object.entries(world.sellPrices)
                 .filter(([item]) => (state.inventory[item] ?? 0) > 0)
                 .map(([item, price]) => (
                   <button key={item} className="sell-option" onClick={() => handleSell(item, state.inventory[item])}>
-                    <ItemIcon item={item} /> Sell all {item} ({state.inventory[item]}) for {price * state.inventory[item]} <ItemIcon item="globcoin" />
+                    <ItemIcon item={item} /> Sell all {item} ({state.inventory[item]}) for {price * state.inventory[item]} <ItemIcon item="coin" />
                   </button>
                 ))}
               {Object.entries(world.sellPrices).every(([item]) => (state.inventory[item] ?? 0) === 0) && (
-                <p className="modal-note">You don't have anything the store wants right now.</p>
+                <p className="modal-note">You don't have any crafted goods to sell right now.</p>
               )}
             </>
           )}

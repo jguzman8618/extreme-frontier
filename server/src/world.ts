@@ -1,24 +1,54 @@
 // ---------- World layout ----------
-// Small, fixed, hand-placed map. No procedural generation — every tile's
-// position is deliberate so the world is legible at this size. Grows later.
+// Bigger map, more room for a populated server: 16 homesteads, river
+// splitting east/west with two bridge crossings.
 
-export const MAP_W = 20;
-export const MAP_H = 20;
+export const MAP_W = 40;
+export const MAP_H = 40;
 
 export type Terrain = 'grass' | 'water';
 
-// A river splits the map north-south, columns 9-10, with two bridge
-// crossings so it's a landmark, not just an obstacle.
+const RIVER_X = [19, 20];
+const BRIDGES = [9, 30];
+
 export function terrainAt(x: number, y: number): Terrain {
-  const inRiver = x >= 9 && x <= 10;
-  const isBridge = y === 4 || y === 15;
-  if (inRiver && !isBridge) return 'water';
+  const inRiver = x >= RIVER_X[0] && x <= RIVER_X[1];
+  if (inRiver && !BRIDGES.includes(y)) return 'water';
   return 'grass';
 }
 
 export function isWalkable(x: number, y: number): boolean {
   if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return false;
   return terrainAt(x, y) !== 'water';
+}
+
+// ---------- Homestead plots ----------
+// 16 plots, 5x5, in a symmetric 4-row x (2+2) grid mirrored across the river.
+
+export interface PlotConfig {
+  id: string;
+  x: number;
+  y: number;
+  size: number;
+}
+
+export const PLOTS: PlotConfig[] = [
+  { id: 'plot1', x: 2, y: 1, size: 5 }, { id: 'plot2', x: 9, y: 1, size: 5 },
+  { id: 'plot3', x: 23, y: 1, size: 5 }, { id: 'plot4', x: 30, y: 1, size: 5 },
+  { id: 'plot5', x: 2, y: 10, size: 5 }, { id: 'plot6', x: 9, y: 10, size: 5 },
+  { id: 'plot7', x: 23, y: 10, size: 5 }, { id: 'plot8', x: 30, y: 10, size: 5 },
+  { id: 'plot9', x: 2, y: 19, size: 5 }, { id: 'plot10', x: 9, y: 19, size: 5 },
+  { id: 'plot11', x: 23, y: 19, size: 5 }, { id: 'plot12', x: 30, y: 19, size: 5 },
+  { id: 'plot13', x: 2, y: 28, size: 5 }, { id: 'plot14', x: 9, y: 28, size: 5 },
+  { id: 'plot15', x: 23, y: 28, size: 5 }, { id: 'plot16', x: 30, y: 28, size: 5 },
+];
+
+export function plotAt(x: number, y: number): PlotConfig | undefined {
+  return PLOTS.find((p) => x >= p.x && x < p.x + p.size && y >= p.y && y < p.y + p.size);
+}
+
+export function plotCenter(p: PlotConfig): { x: number; y: number } {
+  const c = Math.floor(p.size / 2);
+  return { x: p.x + c, y: p.y + c };
 }
 
 // ---------- Gatherable resource nodes ----------
@@ -34,43 +64,38 @@ export interface ResourceNodeConfig {
   yieldAmount: number;
 }
 
+// Placed in the gaps between homestead rows/columns — verified clear of
+// every plot and the river.
 export const RESOURCE_NODES: ResourceNodeConfig[] = [
-  { id: 'tree1', x: 2, y: 2, type: 'wood', respawnMs: 20_000, yieldAmount: 2 },
-  { id: 'tree2', x: 3, y: 5, type: 'wood', respawnMs: 20_000, yieldAmount: 2 },
-  { id: 'tree3', x: 16, y: 3, type: 'wood', respawnMs: 20_000, yieldAmount: 2 },
-  { id: 'tree4', x: 17, y: 17, type: 'wood', respawnMs: 20_000, yieldAmount: 2 },
-  { id: 'tree5', x: 1, y: 17, type: 'wood', respawnMs: 20_000, yieldAmount: 2 },
-  { id: 'rock1', x: 5, y: 12, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'rock2', x: 14, y: 8, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'rock3', x: 12, y: 18, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'tree1', x: 5, y: 7, type: 'wood', respawnMs: 20_000, yieldAmount: 2 },
+  { id: 'tree2', x: 12, y: 7, type: 'wood', respawnMs: 20_000, yieldAmount: 2 },
+  { id: 'tree3', x: 16, y: 16, type: 'wood', respawnMs: 20_000, yieldAmount: 2 },
+  { id: 'tree4', x: 5, y: 25, type: 'wood', respawnMs: 20_000, yieldAmount: 2 },
+  { id: 'tree5', x: 12, y: 25, type: 'wood', respawnMs: 20_000, yieldAmount: 2 },
+  { id: 'tree6', x: 26, y: 34, type: 'wood', respawnMs: 20_000, yieldAmount: 2 },
+  { id: 'rock1', x: 16, y: 7, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'rock2', x: 26, y: 16, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'rock3', x: 16, y: 25, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'rock4', x: 5, y: 16, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'rock5', x: 26, y: 7, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'rock6', x: 25, y: 34, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
 ];
 
-// ---------- Homestead plots ----------
-// Fixed 3x3 claimable plots scattered away from the river and resource nodes.
+export const SHOP_LOCATION = { x: 18, y: 20 };
 
-export interface PlotConfig {
-  id: string;
-  x: number; // top-left corner
-  y: number;
-  size: number;
-}
-
-export const PLOTS: PlotConfig[] = [
-  { id: 'plot1', x: 3, y: 0, size: 3 },
-  { id: 'plot2', x: 14, y: 0, size: 3 },
-  { id: 'plot3', x: 3, y: 9, size: 3 },
-  { id: 'plot4', x: 14, y: 9, size: 3 },
-  { id: 'plot5', x: 3, y: 16, size: 3 },
-  { id: 'plot6', x: 14, y: 16, size: 3 },
-];
-
-export function plotAt(x: number, y: number): PlotConfig | undefined {
-  return PLOTS.find((p) => x >= p.x && x < p.x + p.size && y >= p.y && y < p.y + p.size);
-}
-
-export function plotCenter(p: PlotConfig): { x: number; y: number } {
-  const c = Math.floor(p.size / 2);
-  return { x: p.x + c, y: p.y + c };
+// Resource nodes relocate to a new random clear spot each time they're
+// depleted, instead of always respawning in the same place.
+export function randomFreeResourceSpot(occupied: (x: number, y: number) => boolean): { x: number; y: number } {
+  for (let attempt = 0; attempt < 500; attempt++) {
+    const x = 1 + Math.floor(Math.random() * (MAP_W - 2));
+    const y = 1 + Math.floor(Math.random() * (MAP_H - 2));
+    if (!isWalkable(x, y)) continue;
+    if (plotAt(x, y)) continue;
+    if (x === SHOP_LOCATION.x && y === SHOP_LOCATION.y) continue;
+    if (occupied(x, y)) continue;
+    return { x, y };
+  }
+  return { x: RESOURCE_NODES[0].x, y: RESOURCE_NODES[0].y };
 }
 
 // ---------- Crops (planted on your own plot's soil tiles) ----------
@@ -90,6 +115,8 @@ export const CROPS: Record<string, CropConfig> = {
 };
 
 // ---------- Buildings (placed on your own plot) ----------
+// Cabin unlocks the plot — nothing else works until one is built. Shed
+// unlocks farming; Barn unlocks livestock.
 
 export interface BuildingConfig {
   id: string;
@@ -100,14 +127,34 @@ export interface BuildingConfig {
 
 export const BUILDINGS: Record<string, BuildingConfig> = {
   cabin: { id: 'cabin', name: 'Cabin', icon: '🛖', cost: { wood: 10 } },
+  shed: { id: 'shed', name: 'Shed', icon: '🏠', cost: { wood: 6, stone: 2 } },
   barn: { id: 'barn', name: 'Barn', icon: '🏚️', cost: { wood: 8, stone: 4 } },
   fence: { id: 'fence', name: 'Fence', icon: '🚧', cost: { wood: 2 } },
   well: { id: 'well', name: 'Well', icon: '⛲', cost: { stone: 6 } },
 };
 
-export const STARTING_INVENTORY: Record<string, number> = { wood: 5, stone: 2, globcoin: 50 };
+// ---------- Livestock (kept on your plot once you have a Barn) ----------
 
-// ---------- Crafting (turn raw resources/crops into sellable goods) ----------
+export interface LivestockConfig {
+  id: string;
+  name: string;
+  icon: string;
+  cost: number;
+  produceItem: string;
+  produceIcon: string;
+  produceQty: number;
+  produceTimeMs: number;
+}
+
+export const LIVESTOCK: Record<string, LivestockConfig> = {
+  chicken: { id: 'chicken', name: 'Chicken', icon: '🐔', cost: 15, produceItem: 'egg', produceIcon: '🥚', produceQty: 3, produceTimeMs: 30_000 },
+  sheep: { id: 'sheep', name: 'Sheep', icon: '🐑', cost: 25, produceItem: 'wool', produceIcon: '🧶', produceQty: 2, produceTimeMs: 45_000 },
+  cow: { id: 'cow', name: 'Cow', icon: '🐄', cost: 30, produceItem: 'milk', produceIcon: '🥛', produceQty: 2, produceTimeMs: 60_000 },
+};
+
+export const STARTING_INVENTORY: Record<string, number> = { wood: 5, stone: 2, coin: 1000 };
+
+// ---------- Crafting (turn raw resources/crops/animal goods into sellable items) ----------
 
 export interface CraftRecipeConfig {
   id: string;
@@ -121,24 +168,24 @@ export const CRAFT_RECIPES: Record<string, CraftRecipeConfig> = {
   tools: { id: 'tools', name: 'Tools', icon: '🛠️', inputs: { wood: 3, stone: 2 }, outputQty: 1 },
   bread: { id: 'bread', name: 'Bread', icon: '🍞', inputs: { wheat: 3 }, outputQty: 2 },
   furniture: { id: 'furniture', name: 'Furniture', icon: '🪑', inputs: { wood: 6 }, outputQty: 1 },
+  cheese: { id: 'cheese', name: 'Cheese', icon: '🧀', inputs: { milk: 2 }, outputQty: 1 },
+  yarn: { id: 'yarn', name: 'Yarn', icon: '🧵', inputs: { wool: 2 }, outputQty: 1 },
+  omelette: { id: 'omelette', name: 'Omelette', icon: '🍳', inputs: { egg: 2 }, outputQty: 1 },
 };
 
 // ---------- Homesteading cost ----------
-// Priced so starting Glob Coins cover exactly one homestead — buying a
-// second means actually earning coins first, not just claiming freely.
 
-export const HOMESTEAD_COST = 50;
+export const HOMESTEAD_COST = 1000;
+export const MAX_HOMESTEADS_PER_PLAYER = 3;
 
 // ---------- General Store ----------
-// Deliberately placed well away from every homestead plot so it's a real
-// trip, not something you can sell from your own porch. Only crafted
-// goods are sellable — raw gathered/farmed resources have to be turned
-// into something first.
-
-export const SHOP_LOCATION = { x: 11, y: 9 };
+// Only crafted goods are sellable, not raw gathered/farmed goods.
 
 export const SELL_PRICES: Record<string, number> = {
-  tools: 15,
-  bread: 4,
-  furniture: 10,
+  tools: 3,
+  bread: 1,
+  furniture: 2,
+  cheese: 2,
+  yarn: 1,
+  omelette: 1,
 };

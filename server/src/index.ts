@@ -9,11 +9,13 @@ import { randomUUID } from 'crypto';
 import db from './db';
 import {
   MAP_W, MAP_H, terrainAt, isWalkable,
-  RESOURCE_NODES, PLOTS, plotAt, plotCenter,
-  CROPS, BUILDINGS, STARTING_INVENTORY,
-  SHOP_LOCATION, SELL_PRICES, CRAFT_RECIPES, HOMESTEAD_COST,
+  RESOURCE_NODES, randomFreeResourceSpot,
+  PLOTS, plotAt,
+  CROPS, BUILDINGS, LIVESTOCK, STARTING_INVENTORY,
+  SHOP_LOCATION, SELL_PRICES, CRAFT_RECIPES,
+  HOMESTEAD_COST, MAX_HOMESTEADS_PER_PLAYER,
 } from './world';
-import { PlayerRow, CropRow, BuildingRow, PlotOwnerRow } from './types';
+import { PlayerRow, CropRow, BuildingRow } from './types';
 
 const app = express();
 app.use(cors());
@@ -54,8 +56,7 @@ function removeItem(playerId: string, item: string, qty: number): boolean {
 }
 
 function allPlayersPublic() {
-  const rows = db.prepare('SELECT id, username, x, y FROM players').all() as Pick<PlayerRow, 'id' | 'username' | 'x' | 'y'>[];
-  return rows;
+  return db.prepare('SELECT id, username, x, y FROM players').all() as Pick<PlayerRow, 'id' | 'username' | 'x' | 'y'>[];
 }
 
 function allPlotOwners(): Record<string, { ownerId: string; username: string; farmName: string | null }> {
@@ -72,7 +73,7 @@ function allBuildings(): BuildingRow[] {
   return db.prepare('SELECT * FROM buildings').all() as BuildingRow[];
 }
 
-function allCrops(): { x: number; y: number; ownerId: string; cropType: string; plantedAt: number; ready: boolean }[] {
+function allCrops() {
   const rows = db.prepare('SELECT * FROM crops').all() as CropRow[];
   return rows.map((r) => {
     const cfg = CROPS[r.crop_type];
@@ -81,19 +82,42 @@ function allCrops(): { x: number; y: number; ownerId: string; cropType: string; 
   });
 }
 
+interface LivestockRow { x: number; y: number; plot_id: string; owner_id: string; type: string; last_collected_at: number }
+function allLivestock() {
+  const rows = db.prepare('SELECT * FROM livestock').all() as LivestockRow[];
+  return rows.map((r) => {
+    const cfg = LIVESTOCK[r.type];
+    const ready = !!cfg && Date.now() - r.last_collected_at >= cfg.produceTimeMs;
+    return { x: r.x, y: r.y, ownerId: r.owner_id, type: r.type, lastCollectedAt: r.last_collected_at, ready };
+  });
+}
+
+function seedResourceState(nodeId: string, defaultX: number, defaultY: number) {
+  const existing = db.prepare('SELECT * FROM resource_state WHERE node_id = ?').get(nodeId);
+  if (!existing) {
+    db.prepare('INSERT INTO resource_state (node_id, x, y, depleted_until) VALUES (?, ?, ?, 0)').run(nodeId, defaultX, defaultY);
+  }
+}
+for (const n of RESOURCE_NODES) seedResourceState(n.id, n.x, n.y);
+
 function resourceNodeStates() {
-  const rows = db.prepare('SELECT node_id, depleted_until FROM resource_state').all() as { node_id: string; depleted_until: number }[];
-  const byId: Record<string, number> = {};
-  for (const r of rows) byId[r.node_id] = r.depleted_until;
-  return RESOURCE_NODES.map((n) => ({
-    ...n,
-    depletedUntil: byId[n.id] ?? 0,
-    available: (byId[n.id] ?? 0) <= Date.now(),
-  }));
+  const rows = db.prepare('SELECT * FROM resource_state').all() as { node_id: string; x: number; y: number; depleted_until: number }[];
+  const byId: Record<string, { x: number; y: number; depleted_until: number }> = {};
+  for (const r of rows) byId[r.node_id] = r;
+  return RESOURCE_NODES.map((n) => {
+    const state = byId[n.id] ?? { x: n.x, y: n.y, depleted_until: 0 };
+    return { ...n, x: state.x, y: state.y, depletedUntil: state.depleted_until, available: state.depleted_until <= Date.now() };
+  });
+}
+
+function currentResourcePositions(): Record<string, { x: number; y: number }> {
+  const rows = db.prepare('SELECT node_id, x, y FROM resource_state').all() as { node_id: string; x: number; y: number }[];
+  const out: Record<string, { x: number; y: number }> = {};
+  for (const r of rows) out[r.node_id] = { x: r.x, y: r.y };
+  return out;
 }
 
 function findSpawnPoint(): { x: number; y: number } {
-  // Center of the map, nudged until we land on grass.
   let x = Math.floor(MAP_W / 2);
   let y = Math.floor(MAP_H / 2);
   for (let r = 0; r < 20 && !isWalkable(x, y); r++) x += 1;
@@ -102,6 +126,18 @@ function findSpawnPoint(): { x: number; y: number } {
 
 function chebyshev(ax: number, ay: number, bx: number, by: number) {
   return Math.max(Math.abs(ax - bx), Math.abs(ay - by));
+}
+
+function hasBuilding(plotId: string, type: string): boolean {
+  return !!db.prepare('SELECT 1 FROM buildings WHERE plot_id = ? AND type = ?').get(plotId, type);
+}
+
+function tileOccupied(x: number, y: number): boolean {
+  return !!(
+    db.prepare('SELECT 1 FROM buildings WHERE x = ? AND y = ?').get(x, y) ||
+    db.prepare('SELECT 1 FROM crops WHERE x = ? AND y = ?').get(x, y) ||
+    db.prepare('SELECT 1 FROM livestock WHERE x = ? AND y = ?').get(x, y)
+  );
 }
 
 // ---------- auth ----------
@@ -199,14 +235,15 @@ app.get('/api/world', (_req: Request, res: Response) => {
     mapW: MAP_W,
     mapH: MAP_H,
     terrain,
-    resourceNodes: RESOURCE_NODES,
     plots: PLOTS,
     crops: CROPS,
     buildings: BUILDINGS,
+    livestock: LIVESTOCK,
     shopLocation: SHOP_LOCATION,
     sellPrices: SELL_PRICES,
     craftRecipes: CRAFT_RECIPES,
     homesteadCost: HOMESTEAD_COST,
+    maxHomesteads: MAX_HOMESTEADS_PER_PLAYER,
   });
 });
 
@@ -219,6 +256,7 @@ app.get('/api/state', authMiddleware, (req: Request, res: Response) => {
     plotOwners: allPlotOwners(),
     buildings: allBuildings(),
     crops: allCrops(),
+    livestock: allLivestock(),
     resourceNodes: resourceNodeStates(),
   });
 });
@@ -247,21 +285,25 @@ app.post('/api/move', authMiddleware, (req: Request, res: Response) => {
 app.post('/api/gather', authMiddleware, (req: Request, res: Response) => {
   const player = (req as any).player as PlayerRow;
   const { nodeId } = req.body ?? {};
-  const node = RESOURCE_NODES.find((n) => n.id === nodeId);
-  if (!node) return res.status(400).json({ error: 'unknown resource node' });
-  if (chebyshev(player.x, player.y, node.x, node.y) > 1) return res.status(400).json({ error: 'too far away' });
+  const nodeCfg = RESOURCE_NODES.find((n) => n.id === nodeId);
+  if (!nodeCfg) return res.status(400).json({ error: 'unknown resource node' });
 
-  const stateRow = db.prepare('SELECT depleted_until FROM resource_state WHERE node_id = ?').get(node.id) as { depleted_until: number } | undefined;
+  const positions = currentResourcePositions();
+  const pos = positions[nodeId] ?? { x: nodeCfg.x, y: nodeCfg.y };
+  if (chebyshev(player.x, player.y, pos.x, pos.y) > 1) return res.status(400).json({ error: 'too far away' });
+
+  const stateRow = db.prepare('SELECT depleted_until FROM resource_state WHERE node_id = ?').get(nodeId) as { depleted_until: number } | undefined;
   if (stateRow && stateRow.depleted_until > Date.now()) return res.status(400).json({ error: 'not ready yet' });
 
-  addItem(player.id, node.type, node.yieldAmount);
-  const depletedUntil = Date.now() + node.respawnMs;
-  db.prepare(`
-    INSERT INTO resource_state (node_id, depleted_until) VALUES (?, ?)
-    ON CONFLICT(node_id) DO UPDATE SET depleted_until = excluded.depleted_until
-  `).run(node.id, depletedUntil);
+  addItem(player.id, nodeCfg.type, nodeCfg.yieldAmount);
 
-  io.emit('resourceUpdate', { id: node.id, depletedUntil });
+  const occupied = (x: number, y: number) => Object.values(positions).some((p) => p.x === x && p.y === y);
+  const newSpot = randomFreeResourceSpot(occupied);
+  const depletedUntil = Date.now() + nodeCfg.respawnMs;
+  db.prepare('UPDATE resource_state SET x = ?, y = ?, depleted_until = ? WHERE node_id = ?')
+    .run(newSpot.x, newSpot.y, depletedUntil, nodeId);
+
+  io.emit('resourceUpdate', { id: nodeId, x: newSpot.x, y: newSpot.y, depletedUntil });
   res.json({ inventory: getInventory(player.id) });
 });
 
@@ -275,11 +317,16 @@ app.post('/api/plots/:plotId/claim', authMiddleware, (req: Request, res: Respons
   const already = db.prepare('SELECT 1 FROM plot_owners WHERE plot_id = ?').get(plot.id);
   if (already) return res.status(400).json({ error: 'plot already claimed' });
 
+  const owned = db.prepare('SELECT COUNT(*) as c FROM plot_owners WHERE owner_id = ?').get(player.id) as { c: number };
+  if (owned.c >= MAX_HOMESTEADS_PER_PLAYER) {
+    return res.status(400).json({ error: `you can only own ${MAX_HOMESTEADS_PER_PLAYER} homesteads` });
+  }
+
   const inside = player.x >= plot.x && player.x < plot.x + plot.size && player.y >= plot.y && player.y < plot.y + plot.size;
   if (!inside) return res.status(400).json({ error: 'stand on the plot to claim it' });
 
-  const paid = removeItem(player.id, 'globcoin', HOMESTEAD_COST);
-  if (!paid) return res.status(400).json({ error: `not enough Glob Coins (need ${HOMESTEAD_COST})` });
+  const paid = removeItem(player.id, 'coin', HOMESTEAD_COST);
+  if (!paid) return res.status(400).json({ error: `not enough coins (need ${HOMESTEAD_COST})` });
 
   db.prepare('INSERT INTO plot_owners (plot_id, owner_id, claimed_at) VALUES (?, ?, ?)').run(plot.id, player.id, Date.now());
   io.emit('plotUpdate', { plotId: plot.id, ownerId: player.id, username: player.username, farmName: null });
@@ -316,13 +363,13 @@ app.post('/api/buildings', authMiddleware, (req: Request, res: Response) => {
   const owner = db.prepare('SELECT owner_id FROM plot_owners WHERE plot_id = ?').get(plot.id) as { owner_id: string } | undefined;
   if (!owner || owner.owner_id !== player.id) return res.status(403).json({ error: 'not your plot' });
 
-  const occupied = db.prepare('SELECT 1 FROM buildings WHERE x = ? AND y = ?').get(x, y)
-    || db.prepare('SELECT 1 FROM crops WHERE x = ? AND y = ?').get(x, y);
-  if (occupied) return res.status(400).json({ error: 'tile already in use' });
+  if (type !== 'cabin' && !hasBuilding(plot.id, 'cabin')) {
+    return res.status(400).json({ error: 'build a Cabin first — nothing else works without one' });
+  }
+  if (tileOccupied(x, y)) return res.status(400).json({ error: 'tile already in use' });
 
   for (const [item, qty] of Object.entries(cfg.cost)) {
-    const have = getInventory(player.id)[item!] ?? 0;
-    if (have < (qty as number)) return res.status(400).json({ error: `not enough ${item}` });
+    if ((getInventory(player.id)[item!] ?? 0) < (qty as number)) return res.status(400).json({ error: `not enough ${item}` });
   }
   for (const [item, qty] of Object.entries(cfg.cost)) removeItem(player.id, item!, qty as number);
 
@@ -344,9 +391,9 @@ app.post('/api/crops/plant', authMiddleware, (req: Request, res: Response) => {
   const owner = db.prepare('SELECT owner_id FROM plot_owners WHERE plot_id = ?').get(plot.id) as { owner_id: string } | undefined;
   if (!owner || owner.owner_id !== player.id) return res.status(403).json({ error: 'not your plot' });
 
-  const occupied = db.prepare('SELECT 1 FROM buildings WHERE x = ? AND y = ?').get(x, y)
-    || db.prepare('SELECT 1 FROM crops WHERE x = ? AND y = ?').get(x, y);
-  if (occupied) return res.status(400).json({ error: 'tile already in use' });
+  if (!hasBuilding(plot.id, 'cabin')) return res.status(400).json({ error: 'build a Cabin first' });
+  if (!hasBuilding(plot.id, 'shed')) return res.status(400).json({ error: 'build a Shed to farm crops' });
+  if (tileOccupied(x, y)) return res.status(400).json({ error: 'tile already in use' });
 
   db.prepare('INSERT INTO crops (x, y, owner_id, crop_type, planted_at) VALUES (?, ?, ?, ?, ?)').run(x, y, player.id, cropType, Date.now());
   io.emit('cropUpdate', { x, y, ownerId: player.id, cropType, plantedAt: Date.now(), removed: false });
@@ -368,10 +415,49 @@ app.post('/api/crops/harvest', authMiddleware, (req: Request, res: Response) => 
   res.json({ inventory: getInventory(player.id) });
 });
 
+// ---------- livestock ----------
+
+app.post('/api/livestock/buy', authMiddleware, (req: Request, res: Response) => {
+  const player = (req as any).player as PlayerRow;
+  const { x, y, type } = req.body ?? {};
+  const cfg = LIVESTOCK[type];
+  if (!cfg) return res.status(400).json({ error: 'unknown animal' });
+
+  const plot = plotAt(x, y);
+  if (!plot) return res.status(400).json({ error: 'not inside a homestead plot' });
+  const owner = db.prepare('SELECT owner_id FROM plot_owners WHERE plot_id = ?').get(plot.id) as { owner_id: string } | undefined;
+  if (!owner || owner.owner_id !== player.id) return res.status(403).json({ error: 'not your plot' });
+
+  if (!hasBuilding(plot.id, 'cabin')) return res.status(400).json({ error: 'build a Cabin first' });
+  if (!hasBuilding(plot.id, 'barn')) return res.status(400).json({ error: 'build a Barn to keep livestock' });
+  if (tileOccupied(x, y)) return res.status(400).json({ error: 'tile already in use' });
+
+  const paid = removeItem(player.id, 'coin', cfg.cost);
+  if (!paid) return res.status(400).json({ error: `not enough coins (need ${cfg.cost})` });
+
+  db.prepare('INSERT INTO livestock (x, y, plot_id, owner_id, type, last_collected_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(x, y, plot.id, player.id, type, Date.now());
+  io.emit('livestockUpdate', { x, y, ownerId: player.id, type, lastCollectedAt: Date.now(), removed: false });
+  res.json({ inventory: getInventory(player.id) });
+});
+
+app.post('/api/livestock/collect', authMiddleware, (req: Request, res: Response) => {
+  const player = (req as any).player as PlayerRow;
+  const { x, y } = req.body ?? {};
+  const animal = db.prepare('SELECT * FROM livestock WHERE x = ? AND y = ?').get(x, y) as LivestockRow | undefined;
+  if (!animal || animal.owner_id !== player.id) return res.status(403).json({ error: 'not your animal' });
+
+  const cfg = LIVESTOCK[animal.type];
+  if (Date.now() - animal.last_collected_at < cfg.produceTimeMs) return res.status(400).json({ error: 'not ready yet' });
+
+  addItem(player.id, cfg.produceItem, cfg.produceQty);
+  const now = Date.now();
+  db.prepare('UPDATE livestock SET last_collected_at = ? WHERE x = ? AND y = ?').run(now, x, y);
+  io.emit('livestockUpdate', { x, y, ownerId: player.id, type: animal.type, lastCollectedAt: now, removed: false });
+  res.json({ inventory: getInventory(player.id) });
+});
+
 // ---------- crafting ----------
-// Turns raw resources/crops into goods the store will actually buy.
-// Crafting itself is free (no separate station/building required for v1) —
-// the cost is the raw materials it consumes.
 
 app.post('/api/craft', authMiddleware, (req: Request, res: Response) => {
   const player = (req as any).player as PlayerRow;
@@ -389,6 +475,8 @@ app.post('/api/craft', authMiddleware, (req: Request, res: Response) => {
   res.json({ inventory: getInventory(player.id) });
 });
 
+// ---------- general store ----------
+
 app.post('/api/shop/sell', authMiddleware, (req: Request, res: Response) => {
   const player = (req as any).player as PlayerRow;
   const { item, qty } = req.body ?? {};
@@ -398,12 +486,12 @@ app.post('/api/shop/sell', authMiddleware, (req: Request, res: Response) => {
 
   const ok = removeItem(player.id, item, qty);
   if (!ok) return res.status(400).json({ error: `not enough ${item}` });
-  addItem(player.id, 'globcoin', price * qty);
+  addItem(player.id, 'coin', price * qty);
 
   res.json({ inventory: getInventory(player.id) });
 });
 
-// ---------- live barter trading (socket-negotiated, server-validated) ----------
+// ---------- live barter trading ----------
 
 interface TradeSession {
   id: string;
@@ -411,12 +499,8 @@ interface TradeSession {
   offers: Record<string, Record<string, number>>;
   confirmed: Record<string, boolean>;
 }
-const sockets = new Map<string, Socket>(); // playerId -> socket
+const sockets = new Map<string, Socket>();
 const trades = new Map<string, TradeSession>();
-
-function otherPlayer(session: TradeSession, playerId: string) {
-  return session.players[0] === playerId ? session.players[1] : session.players[0];
-}
 
 io.on('connection', (socket: Socket) => {
   let playerId: string | null = null;
@@ -433,8 +517,7 @@ io.on('connection', (socket: Socket) => {
     const me = getPlayerById(playerId);
     const target = getPlayerById(targetId);
     if (!me || !target || chebyshev(me.x, me.y, target.x, target.y) > 1) return;
-    const targetSocket = sockets.get(targetId);
-    targetSocket?.emit('tradeInvite', { fromId: playerId, fromUsername: me.username });
+    sockets.get(targetId)?.emit('tradeInvite', { fromId: playerId, fromUsername: me.username });
   });
 
   socket.on('tradeAccept', ({ fromId }: { fromId: string }) => {
@@ -464,9 +547,7 @@ io.on('connection', (socket: Socket) => {
     session.offers[playerId] = items;
     session.confirmed[session.players[0]] = false;
     session.confirmed[session.players[1]] = false;
-    for (const pid of session.players) {
-      sockets.get(pid)?.emit('tradeUpdate', { sessionId, offers: session.offers, confirmed: session.confirmed });
-    }
+    for (const pid of session.players) sockets.get(pid)?.emit('tradeUpdate', { sessionId, offers: session.offers, confirmed: session.confirmed });
   });
 
   socket.on('tradeConfirm', ({ sessionId }: { sessionId: string }) => {
@@ -489,14 +570,10 @@ io.on('connection', (socket: Socket) => {
         for (const [item, qty] of Object.entries(session.offers[b])) { removeItem(b, item, qty); addItem(a, item, qty); }
       });
       tx();
-      for (const pid of session.players) {
-        sockets.get(pid)?.emit('tradeComplete', { sessionId, inventory: getInventory(pid) });
-      }
+      for (const pid of session.players) sockets.get(pid)?.emit('tradeComplete', { sessionId, inventory: getInventory(pid) });
       trades.delete(sessionId);
     } else {
-      for (const pid of session.players) {
-        sockets.get(pid)?.emit('tradeUpdate', { sessionId, offers: session.offers, confirmed: session.confirmed });
-      }
+      for (const pid of session.players) sockets.get(pid)?.emit('tradeUpdate', { sessionId, offers: session.offers, confirmed: session.confirmed });
     }
   });
 

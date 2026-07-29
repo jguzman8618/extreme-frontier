@@ -16,16 +16,13 @@ export interface PublicPlayer {
   y: number;
 }
 
-export interface ResourceNodeConfig {
+export interface ResourceNodeState {
   id: string;
   x: number;
   y: number;
   type: 'wood' | 'stone';
   respawnMs: number;
   yieldAmount: number;
-}
-
-export interface ResourceNodeState extends ResourceNodeConfig {
   depletedUntil: number;
   available: boolean;
 }
@@ -52,18 +49,38 @@ export interface BuildingConfig {
   cost: Partial<Record<'wood' | 'stone', number>>;
 }
 
+export interface LivestockConfig {
+  id: string;
+  name: string;
+  icon: string;
+  cost: number;
+  produceItem: string;
+  produceIcon: string;
+  produceQty: number;
+  produceTimeMs: number;
+}
+
+export interface CraftRecipeConfig {
+  id: string;
+  name: string;
+  icon: string;
+  inputs: Record<string, number>;
+  outputQty: number;
+}
+
 export interface WorldConfig {
   mapW: number;
   mapH: number;
   terrain: string[][];
-  resourceNodes: ResourceNodeConfig[];
   plots: PlotConfig[];
   crops: Record<string, CropConfig>;
   buildings: Record<string, BuildingConfig>;
+  livestock: Record<string, LivestockConfig>;
   shopLocation: { x: number; y: number };
   sellPrices: Record<string, number>;
-  craftRecipes: Record<string, { id: string; name: string; icon: string; inputs: Record<string, number>; outputQty: number }>;
+  craftRecipes: Record<string, CraftRecipeConfig>;
   homesteadCost: number;
+  maxHomesteads: number;
 }
 
 export interface CropInstance {
@@ -72,6 +89,15 @@ export interface CropInstance {
   ownerId: string;
   cropType: string;
   plantedAt: number;
+  ready: boolean;
+}
+
+export interface LivestockInstance {
+  x: number;
+  y: number;
+  ownerId: string;
+  type: string;
+  lastCollectedAt: number;
   ready: boolean;
 }
 
@@ -94,6 +120,7 @@ export interface GameState {
   plotOwners: PlotOwners;
   buildings: BuildingInstance[];
   crops: CropInstance[];
+  livestock: LivestockInstance[];
   resourceNodes: ResourceNodeState[];
 }
 
@@ -144,3 +171,5 @@ export const plantCrop = (token: string, x: number, y: number, cropType: string)
 export const harvestCrop = (token: string, x: number, y: number) => post(token, '/api/crops/harvest', { x, y });
 export const sellToShop = (token: string, item: string, qty: number) => post(token, '/api/shop/sell', { item, qty });
 export const craftItem = (token: string, recipeId: string) => post(token, '/api/craft', { recipeId });
+export const buyLivestock = (token: string, x: number, y: number, type: string) => post(token, '/api/livestock/buy', { x, y, type });
+export const collectLivestock = (token: string, x: number, y: number) => post(token, '/api/livestock/collect', { x, y });

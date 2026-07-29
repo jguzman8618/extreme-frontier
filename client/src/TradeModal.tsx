@@ -70,8 +70,8 @@ export function TradeModal({
         <div className="trade-columns">
           <div className="trade-col">
             <h4>Your offer {iConfirmed && '✅'}</h4>
-            {Object.keys(myInventory).length === 0 && <p className="modal-note">You have nothing to trade.</p>}
-            {Object.entries(myInventory).map(([item, have]) => (
+            {Object.entries(myInventory).filter(([, have]) => have > 0).length === 0 && <p className="modal-note">You have nothing to trade.</p>}
+            {Object.entries(myInventory).filter(([, have]) => have > 0).map(([item, have]) => (
               <div key={item} className="trade-row">
                 <span>{item} (have {have})</span>
                 <input
