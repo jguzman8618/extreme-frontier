@@ -80,6 +80,10 @@ export async function harvestTile(token: string, x: number, y: number) {
   return post(token, `/api/tiles/${x}/${y}/harvest`);
 }
 
+export async function sellTile(token: string, x: number, y: number) {
+  return post(token, `/api/tiles/${x}/${y}/sell`);
+}
+
 async function post(token: string, path: string, body?: unknown) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',

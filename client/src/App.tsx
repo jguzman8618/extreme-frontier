@@ -10,6 +10,7 @@ import {
   login,
   loginWithDiscord,
   plantTile,
+  sellTile,
 } from './api';
 import { authenticateWithDiscord, isInsideDiscord } from './discord';
 
@@ -93,14 +94,12 @@ export default function App() {
         return;
       }
       if (tile.ownerId !== state.player.id) return; // someone else's land
-      if (!tile.cropType) {
-        setSelected(tile); // open crop picker
-        return;
-      }
       if (tile.ready) {
         await harvestTile(token, x, y);
         await refresh();
+        return;
       }
+      setSelected(tile); // owned, not ready yet: plant (if empty) and/or sell
     } catch (e: any) {
       setError(e.message);
     }
@@ -111,6 +110,25 @@ export default function App() {
     setError(null);
     try {
       await plantTile(token, selected.x, selected.y, cropId);
+      setSelected(null);
+      await refresh();
+    } catch (e: any) {
+      setError(e.message);
+    }
+  }
+
+  function handleLogout() {
+    localStorage.removeItem('ef_token');
+    setToken(null);
+    setState(null);
+    setError(null);
+  }
+
+  async function handleSell() {
+    if (!token || !selected) return;
+    setError(null);
+    try {
+      await sellTile(token, selected.x, selected.y);
       setSelected(null);
       await refresh();
     } catch (e: any) {
@@ -138,6 +156,9 @@ export default function App() {
         <div className="stats">
           <span>{state.player.username}</span>
           <span className="money">${state.player.money}</span>
+          {!inDiscord && (
+            <button className="logout" onClick={handleLogout}>Log out</button>
+          )}
         </div>
       </header>
 
@@ -182,8 +203,8 @@ export default function App() {
       {selected && (
         <div className="modal-backdrop" onClick={() => setSelected(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Plant a crop</h3>
-            {Object.values(state.crops).map((c) => (
+            <h3>Manage this tile</h3>
+            {!selected.cropType && Object.values(state.crops).map((c) => (
               <button
                 key={c.id}
                 className="crop-option"
@@ -194,6 +215,15 @@ export default function App() {
                 sells for ${c.yieldAmount * c.sellPrice}
               </button>
             ))}
+            {selected.cropType && (
+              <p className="modal-note">
+                {state.crops[selected.cropType].name} is still growing — selling this tile now
+                will lose the crop.
+              </p>
+            )}
+            <button className="sell-option" onClick={handleSell}>
+              Sell land back for ${Math.floor(state.tilePrice * 0.5)}
+            </button>
             <button className="cancel" onClick={() => setSelected(null)}>Cancel</button>
           </div>
         </div>

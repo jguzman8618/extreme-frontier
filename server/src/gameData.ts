@@ -18,3 +18,4 @@ export const CROPS: Record<string, CropConfig> = {
 export const MAP_SIZE = 15;
 export const TILE_PRICE = 20;
 export const STARTING_MONEY = 100;
+export const SELL_BACK_RATE = 0.5; // selling land back refunds this fraction of TILE_PRICE

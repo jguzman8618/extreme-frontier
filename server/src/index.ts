@@ -7,7 +7,7 @@ import cors from 'cors';
 import { Server } from 'socket.io';
 import { randomUUID } from 'crypto';
 import db from './db';
-import { CROPS, MAP_SIZE, TILE_PRICE, STARTING_MONEY } from './gameData';
+import { CROPS, MAP_SIZE, TILE_PRICE, STARTING_MONEY, SELL_BACK_RATE } from './gameData';
 import { PlayerRow, TileRow, ClientTile } from './types';
 
 const app = express();
@@ -256,6 +256,26 @@ app.post('/api/tiles/:x/:y/harvest', authMiddleware, (req: Request, res: Respons
 
   broadcastTile(x, y);
   res.json({ player: getPlayerById(player.id), earnings });
+});
+
+app.post('/api/tiles/:x/:y/sell', authMiddleware, (req: Request, res: Response) => {
+  const player = (req as any).player as PlayerRow;
+  const x = Number(req.params.x);
+  const y = Number(req.params.y);
+  if (!inBounds(x, y)) return res.status(400).json({ error: 'out of bounds' });
+
+  const tile = getTile(x, y);
+  if (!tile || tile.owner_id !== player.id) return res.status(403).json({ error: 'not your tile' });
+
+  const refund = Math.floor(TILE_PRICE * SELL_BACK_RATE);
+  const tx = db.transaction(() => {
+    db.prepare('UPDATE players SET money = money + ? WHERE id = ?').run(refund, player.id);
+    db.prepare('DELETE FROM tiles WHERE x = ? AND y = ?').run(x, y);
+  });
+  tx();
+
+  broadcastTile(x, y);
+  res.json({ player: getPlayerById(player.id), refund });
 });
 
 io.on('connection', (socket) => {
