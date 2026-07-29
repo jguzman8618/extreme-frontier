@@ -47,13 +47,18 @@ function isLivestockReady(animal: { type: string; lastCollectedAt: number }, wor
   return Date.now() - animal.lastCollectedAt >= cfg.produceTimeMs;
 }
 
-const CELL_PX = 18;
+const CELL_PX = 13;
 
 export default function App() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('owf_token'));
   const [world, setWorld] = useState<WorldConfig | null>(null);
   const [state, setState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const SILENT_ERRORS = ['unauthorized', 'can only move one tile at a time', 'not walkable'];
+  function showError(msg: string) {
+    if (SILENT_ERRORS.some((s) => msg.toLowerCase().includes(s))) return;
+    setError(msg);
+  }
   const [, setTick] = useState(0);
   const [socket, setSocket] = useState<Socket | null>(null);
   const inDiscord = useMemo(() => isInsideDiscord(), []);
@@ -63,13 +68,14 @@ export default function App() {
   const [tradeSession, setTradeSession] = useState<TradeSessionState | null>(null);
   const [tradeMessage, setTradeMessage] = useState<string | null>(null);
   const [pendingInviteTo, setPendingInviteTo] = useState<string | null>(null);
+  const [craftCategory, setCraftCategory] = useState<'food' | 'goods'>('food');
 
   useEffect(() => {
     if (!inDiscord || token) return;
     authenticateWithDiscord()
       .then(({ discordAccessToken }) => loginWithDiscord(discordAccessToken))
       .then(({ token: t }) => { localStorage.setItem('owf_token', t); setToken(t); })
-      .catch((e) => setError(e.message))
+      .catch((e) => showError(e.message))
       .finally(() => setDiscordAuthing(false));
   }, [inDiscord, token]);
 
@@ -79,7 +85,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    getWorld().then(setWorld).catch((e) => setError(e.message));
+    getWorld().then(setWorld).catch((e) => showError(e.message));
   }, []);
 
   useEffect(() => {
@@ -87,7 +93,7 @@ export default function App() {
     getState(token)
       .then(setState)
       .catch((e) => {
-        setError(e.message);
+        showError(e.message);
         setToken(null);
         localStorage.removeItem('owf_token');
       });
@@ -201,7 +207,7 @@ export default function App() {
       e.preventDefault();
       const nx = state!.player.x + dx;
       const ny = state!.player.y + dy;
-      move(token!, nx, ny).catch((err) => setError(err.message));
+      move(token!, nx, ny).catch((err) => showError(err.message));
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -209,52 +215,52 @@ export default function App() {
 
   const handleGather = useCallback((nodeId: string) => {
     if (!token) return;
-    gather(token, nodeId).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => setError(e.message));
+    gather(token, nodeId).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => showError(e.message));
   }, [token]);
 
   const handleClaim = useCallback((plotId: string) => {
     if (!token) return;
-    claimPlot(token, plotId).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => setError(e.message));
+    claimPlot(token, plotId).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => showError(e.message));
   }, [token]);
 
   const handleBuild = useCallback((x: number, y: number, type: string) => {
     if (!token) return;
-    buildBuilding(token, x, y, type).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => setError(e.message));
+    buildBuilding(token, x, y, type).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => showError(e.message));
   }, [token]);
 
   const handlePlant = useCallback((x: number, y: number, cropType: string) => {
     if (!token) return;
-    plantCrop(token, x, y, cropType).catch((e) => setError(e.message));
+    plantCrop(token, x, y, cropType).catch((e) => showError(e.message));
   }, [token]);
 
   const handleHarvest = useCallback((x: number, y: number) => {
     if (!token) return;
-    harvestCrop(token, x, y).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => setError(e.message));
+    harvestCrop(token, x, y).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => showError(e.message));
   }, [token]);
 
   const handleSell = useCallback((item: string, qty: number) => {
     if (!token) return;
-    sellToShop(token, item, qty).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => setError(e.message));
+    sellToShop(token, item, qty).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => showError(e.message));
   }, [token]);
 
   const handleCraft = useCallback((recipeId: string) => {
     if (!token) return;
-    craftItem(token, recipeId).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => setError(e.message));
+    craftItem(token, recipeId).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => showError(e.message));
   }, [token]);
 
   const handleNameFarm = useCallback((plotId: string, name: string) => {
     if (!token) return;
-    nameFarm(token, plotId, name).catch((e) => setError(e.message));
+    nameFarm(token, plotId, name).catch((e) => showError(e.message));
   }, [token]);
 
   const handleBuyLivestock = useCallback((x: number, y: number, type: string) => {
     if (!token) return;
-    buyLivestock(token, x, y, type).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => setError(e.message));
+    buyLivestock(token, x, y, type).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => showError(e.message));
   }, [token]);
 
   const handleCollectLivestock = useCallback((x: number, y: number) => {
     if (!token) return;
-    collectLivestock(token, x, y).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => setError(e.message));
+    collectLivestock(token, x, y).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => showError(e.message));
   }, [token]);
 
   function requestTrade(targetId: string) {
@@ -310,7 +316,7 @@ export default function App() {
   const buildingHere = state.buildings.find((b) => b.x === here.x && b.y === here.y);
   const cropHere = state.crops.find((c) => c.x === here.x && c.y === here.y);
   const livestockHere = state.livestock.find((a) => a.x === here.x && a.y === here.y);
-  const nearbyNodes = state.resourceNodes.filter((n) => chebyshev(here.x, here.y, n.x, n.y) <= 1);
+  const nearbyNodes = state.resourceNodes.filter((n) => chebyshev(here.x, here.y, n.x, n.y) <= 1 && n.depletedUntil <= Date.now());
   const nearbyPlayers = state.players.filter((p) => p.id !== me.id && chebyshev(here.x, here.y, p.x, p.y) <= 1);
   const nearShop = distToRect(here.x, here.y, world.shopLocation.x, world.shopLocation.y, world.shopLocation.size) <= 1;
 
@@ -368,14 +374,12 @@ export default function App() {
                 ].filter(Boolean).join(' ');
 
                 let content: string | null = null;
-                const shopCenter = Math.floor(world.shopLocation.size / 2);
-                if (isShopTile && x === world.shopLocation.x + shopCenter && y === world.shopLocation.y + shopCenter) content = '🏪';
+                if (isShopTile && x === world.shopLocation.x && y === world.shopLocation.y) content = '🏪';
                 else if (building) content = world.buildings[building.type]?.icon ?? '🏗️';
                 else if (animal) content = world.livestock[animal.type]?.icon ?? '🐾';
                 else if (crop) content = world.crops[crop.cropType]?.icon ?? '🌱';
-                else if (node) {
-                  const nodeAvailable = node.depletedUntil <= Date.now();
-                  content = node.type === 'wood' ? (nodeAvailable ? '🌲' : '🪵') : (nodeAvailable ? '🪨' : '⛏️');
+                else if (node && node.depletedUntil <= Date.now()) {
+                  content = node.type === 'wood' ? '🌲' : '🪨';
                 }
 
                 return (
@@ -473,14 +477,33 @@ export default function App() {
           )}
 
           <h4>🔨 Craft</h4>
-          {Object.values(world.craftRecipes).map((r) => {
-            const affordable = Object.entries(r.inputs).every(([item, qty]) => (state.inventory[item] ?? 0) >= (qty as number));
-            return (
+          <div className="craft-tabs">
+            <button
+              className={`craft-tab ${craftCategory === 'food' ? 'craft-tab-active' : ''}`}
+              onClick={() => setCraftCategory('food')}
+            >
+              🍞 Food
+            </button>
+            <button
+              className={`craft-tab ${craftCategory === 'goods' ? 'craft-tab-active' : ''}`}
+              onClick={() => setCraftCategory('goods')}
+            >
+              🛠️ Goods
+            </button>
+          </div>
+          {Object.values(world.craftRecipes)
+            .filter((r) => r.category === craftCategory)
+            .map((r) => ({
+              r,
+              affordable: Object.entries(r.inputs).every(([item, qty]) => (state.inventory[item] ?? 0) >= (qty as number)),
+            }))
+            .sort((a, b) => (a.affordable === b.affordable ? 0 : a.affordable ? -1 : 1))
+            .map(({ r, affordable }) => (
               <button key={r.id} className="crop-option" disabled={!affordable} onClick={() => handleCraft(r.id)}>
                 {r.icon} {r.name} — needs {Object.entries(r.inputs).map(([i, q]) => `${q} ${i}`).join(', ')} → {r.outputQty}x
+                {world.sellPrices[r.id] && ` (sells for ${world.sellPrices[r.id]})`}
               </button>
-            );
-          })}
+            ))}
 
           {nearbyNodes.length > 0 && (
             <>
