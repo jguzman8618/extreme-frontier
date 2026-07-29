@@ -93,6 +93,16 @@ body {
   border-color: #a05c2c;
 }
 
+.warning-note {
+  font-size: 12px;
+  color: #ffdada;
+  background: #6b1f1f;
+  padding: 8px;
+  border-radius: 6px;
+  margin: 4px 0;
+  font-weight: 600;
+}
+
 .error-banner {
   background: #6b1f1f;
   color: #fff;

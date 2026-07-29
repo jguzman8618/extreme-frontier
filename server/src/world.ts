@@ -7,8 +7,8 @@ export const MAP_H = 40;
 
 export type Terrain = 'grass' | 'water';
 
-const RIVER_X = [19, 20];
-const BRIDGES = [9, 30];
+const RIVER_X = [18, 19];
+const BRIDGES = [6, 24];
 
 export function terrainAt(x: number, y: number): Terrain {
   const inRiver = x >= RIVER_X[0] && x <= RIVER_X[1];
@@ -22,7 +22,9 @@ export function isWalkable(x: number, y: number): boolean {
 }
 
 // ---------- Homestead plots ----------
-// 16 plots, 5x5, in a symmetric 4-row x (2+2) grid mirrored across the river.
+// Three sizes at three price points: Small (3x3) is what starting coins
+// cover; Medium (5x5) and Large (7x7) require actually earning more.
+// 16 plots total: 8 small, 6 medium, 2 large, mirrored west/east.
 
 export interface PlotConfig {
   id: string;
@@ -32,15 +34,27 @@ export interface PlotConfig {
 }
 
 export const PLOTS: PlotConfig[] = [
-  { id: 'plot1', x: 2, y: 1, size: 5 }, { id: 'plot2', x: 9, y: 1, size: 5 },
-  { id: 'plot3', x: 23, y: 1, size: 5 }, { id: 'plot4', x: 30, y: 1, size: 5 },
-  { id: 'plot5', x: 2, y: 10, size: 5 }, { id: 'plot6', x: 9, y: 10, size: 5 },
-  { id: 'plot7', x: 23, y: 10, size: 5 }, { id: 'plot8', x: 30, y: 10, size: 5 },
-  { id: 'plot9', x: 2, y: 19, size: 5 }, { id: 'plot10', x: 9, y: 19, size: 5 },
-  { id: 'plot11', x: 23, y: 19, size: 5 }, { id: 'plot12', x: 30, y: 19, size: 5 },
-  { id: 'plot13', x: 2, y: 28, size: 5 }, { id: 'plot14', x: 9, y: 28, size: 5 },
-  { id: 'plot15', x: 23, y: 28, size: 5 }, { id: 'plot16', x: 30, y: 28, size: 5 },
+  { id: 'plot1', x: 2, y: 1, size: 3 }, { id: 'plot2', x: 9, y: 1, size: 5 },
+  { id: 'plot3', x: 22, y: 1, size: 5 }, { id: 'plot4', x: 29, y: 1, size: 3 },
+  { id: 'plot5', x: 2, y: 8, size: 5 }, { id: 'plot6', x: 9, y: 8, size: 3 },
+  { id: 'plot7', x: 22, y: 8, size: 3 }, { id: 'plot8', x: 29, y: 8, size: 7 },
+  { id: 'plot9', x: 2, y: 17, size: 3 }, { id: 'plot10', x: 9, y: 17, size: 7 },
+  { id: 'plot11', x: 22, y: 17, size: 5 }, { id: 'plot12', x: 29, y: 17, size: 3 },
+  { id: 'plot13', x: 2, y: 26, size: 5 }, { id: 'plot14', x: 9, y: 26, size: 3 },
+  { id: 'plot15', x: 22, y: 26, size: 3 }, { id: 'plot16', x: 29, y: 26, size: 5 },
 ];
+
+// ---------- Homestead pricing tiers ----------
+// Keyed by plot size. Smallest tier matches starting coins exactly —
+// everything bigger has to be earned. Homesteads can never be sold once
+// bought; the client is required to show that plainly before purchase.
+
+export const HOMESTEAD_TIERS: Record<number, { label: string; cost: number }> = {
+  3: { label: 'Small', cost: 1000 },
+  5: { label: 'Medium', cost: 2500 },
+  7: { label: 'Large', cost: 5000 },
+};
+export const MAX_HOMESTEADS_PER_PLAYER = 3;
 
 export function plotAt(x: number, y: number): PlotConfig | undefined {
   return PLOTS.find((p) => x >= p.x && x < p.x + p.size && y >= p.y && y < p.y + p.size);
@@ -67,37 +81,37 @@ export interface ResourceNodeConfig {
 // Placed in the gaps between homestead rows/columns — verified clear of
 // every plot and the river.
 export const RESOURCE_NODES: ResourceNodeConfig[] = [
-  { id: 'tree1', x: 5, y: 7, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree2', x: 12, y: 7, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree3', x: 16, y: 16, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree4', x: 5, y: 25, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree5', x: 12, y: 25, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree6', x: 26, y: 34, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree7', x: 7, y: 3, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree8', x: 22, y: 2, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree9', x: 7, y: 12, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree10', x: 22, y: 12, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree11', x: 1, y: 21, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree12', x: 25, y: 25, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree13', x: 5, y: 35, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree14', x: 22, y: 38, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'rock1', x: 16, y: 7, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock2', x: 26, y: 16, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock3', x: 16, y: 25, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock4', x: 5, y: 16, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock5', x: 26, y: 7, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock6', x: 25, y: 34, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock7', x: 14, y: 3, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock8', x: 35, y: 5, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock9', x: 12, y: 15, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock10', x: 35, y: 15, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock11', x: 14, y: 21, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock12', x: 35, y: 25, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock13', x: 15, y: 35, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock14', x: 35, y: 35, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'tree1', x: 2, y: 5, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'tree2', x: 14, y: 5, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'tree3', x: 31, y: 5, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'tree4', x: 2, y: 15, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'tree5', x: 14, y: 15, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'tree6', x: 31, y: 15, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'tree7', x: 2, y: 25, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'tree8', x: 14, y: 25, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'tree9', x: 31, y: 25, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'tree10', x: 2, y: 35, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'tree11', x: 14, y: 35, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'tree12', x: 31, y: 35, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'tree13', x: 8, y: 5, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'tree14', x: 20, y: 5, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'rock1', x: 20, y: 15, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'rock2', x: 37, y: 5, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'rock3', x: 25, y: 15, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'rock4', x: 37, y: 15, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'rock5', x: 8, y: 25, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'rock6', x: 20, y: 25, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'rock7', x: 25, y: 25, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'rock8', x: 37, y: 25, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'rock9', x: 8, y: 35, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'rock10', x: 20, y: 35, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'rock11', x: 25, y: 35, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'rock12', x: 37, y: 35, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'rock13', x: 24, y: 6, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'rock14', x: 6, y: 24, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
 ];
 
-export const SHOP_LOCATION = { x: 17, y: 17, size: 2 };
+export const SHOP_LOCATION = { x: 16, y: 12, size: 2 };
 
 function insideShop(x: number, y: number): boolean {
   return x >= SHOP_LOCATION.x && x < SHOP_LOCATION.x + SHOP_LOCATION.size &&
@@ -202,11 +216,6 @@ export const CRAFT_RECIPES: Record<string, CraftRecipeConfig> = {
   toolbox: { id: 'toolbox', name: 'Toolbox', icon: '🧰', category: 'goods', inputs: { tools: 2, furniture: 1 }, outputQty: 1 },
   feast: { id: 'feast', name: 'Feast', icon: '🍲', category: 'food', inputs: { bread: 2, cheese: 1, omelette: 1 }, outputQty: 1 },
 };
-
-// ---------- Homesteading cost ----------
-
-export const HOMESTEAD_COST = 1000;
-export const MAX_HOMESTEADS_PER_PLAYER = 3;
 
 // ---------- General Store ----------
 // Crafted goods sell for real money; raw crops can be sold too but only

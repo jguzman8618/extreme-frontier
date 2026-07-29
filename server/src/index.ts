@@ -7,13 +7,14 @@ import cors from 'cors';
 import { Server, Socket } from 'socket.io';
 import { randomUUID } from 'crypto';
 import db from './db';
+import { containsForbiddenWord } from './moderation';
 import {
   MAP_W, MAP_H, terrainAt, isWalkable,
   RESOURCE_NODES, randomFreeResourceSpot,
   PLOTS, plotAt,
   CROPS, BUILDINGS, LIVESTOCK, STARTING_INVENTORY,
   SHOP_LOCATION, SELL_PRICES, CRAFT_RECIPES,
-  HOMESTEAD_COST, MAX_HOMESTEADS_PER_PLAYER,
+  HOMESTEAD_TIERS, MAX_HOMESTEADS_PER_PLAYER,
 } from './world';
 import { PlayerRow, CropRow, BuildingRow } from './types';
 
@@ -154,6 +155,7 @@ app.post('/api/login', (req: Request, res: Response) => {
     return res.status(400).json({ error: 'username required (min 2 chars)' });
   }
   const clean = username.trim().slice(0, 20);
+  if (containsForbiddenWord(clean)) return res.status(400).json({ error: 'that name is not allowed' });
 
   const existing = db.prepare('SELECT 1 FROM players WHERE username = ?').get(clean);
   if (existing) return res.status(409).json({ error: 'that username is already taken' });
@@ -248,7 +250,7 @@ app.get('/api/world', (_req: Request, res: Response) => {
     shopLocation: SHOP_LOCATION,
     sellPrices: SELL_PRICES,
     craftRecipes: CRAFT_RECIPES,
-    homesteadCost: HOMESTEAD_COST,
+    homesteadTiers: HOMESTEAD_TIERS,
     maxHomesteads: MAX_HOMESTEADS_PER_PLAYER,
   });
 });
@@ -331,8 +333,9 @@ app.post('/api/plots/:plotId/claim', authMiddleware, (req: Request, res: Respons
   const inside = player.x >= plot.x && player.x < plot.x + plot.size && player.y >= plot.y && player.y < plot.y + plot.size;
   if (!inside) return res.status(400).json({ error: 'stand on the plot to claim it' });
 
-  const paid = removeItem(player.id, 'coin', HOMESTEAD_COST);
-  if (!paid) return res.status(400).json({ error: `not enough coins (need ${HOMESTEAD_COST})` });
+  const tier = HOMESTEAD_TIERS[plot.size];
+  const paid = removeItem(player.id, 'coin', tier.cost);
+  if (!paid) return res.status(400).json({ error: `not enough coins (need ${tier.cost} for a ${tier.label} homestead)` });
 
   db.prepare('INSERT INTO plot_owners (plot_id, owner_id, claimed_at) VALUES (?, ?, ?)').run(plot.id, player.id, Date.now());
   io.emit('plotUpdate', { plotId: plot.id, ownerId: player.id, username: player.username, farmName: null });
@@ -350,6 +353,8 @@ app.post('/api/plots/:plotId/name', authMiddleware, (req: Request, res: Response
   if (!owner || owner.owner_id !== player.id) return res.status(403).json({ error: 'not your plot' });
 
   const clean = name.trim().slice(0, 30);
+  if (containsForbiddenWord(clean)) return res.status(400).json({ error: 'that name is not allowed' });
+
   db.prepare('UPDATE plot_owners SET farm_name = ? WHERE plot_id = ?').run(clean, plot.id);
   io.emit('plotUpdate', { plotId: plot.id, ownerId: player.id, username: player.username, farmName: clean });
   res.json({ ok: true, farmName: clean });

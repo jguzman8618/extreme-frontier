@@ -69,6 +69,7 @@ export default function App() {
   const [tradeMessage, setTradeMessage] = useState<string | null>(null);
   const [pendingInviteTo, setPendingInviteTo] = useState<string | null>(null);
   const [craftCategory, setCraftCategory] = useState<'food' | 'goods'>('food');
+  const [claimConfirmPlot, setClaimConfirmPlot] = useState<PlotConfig | null>(null);
 
   useEffect(() => {
     if (!inDiscord || token) return;
@@ -220,7 +221,15 @@ export default function App() {
 
   const handleClaim = useCallback((plotId: string) => {
     if (!token) return;
-    claimPlot(token, plotId).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => showError(e.message));
+    claimPlot(token, plotId)
+      .then((r) => {
+        setState((p) => (p ? { ...p, inventory: r.inventory } : p));
+        setClaimConfirmPlot(null);
+      })
+      .catch((e) => {
+        showError(e.message);
+        setClaimConfirmPlot(null);
+      });
   }, [token]);
 
   const handleBuild = useCallback((x: number, y: number, type: string) => {
@@ -399,15 +408,20 @@ export default function App() {
 
         <div className="side-panel">
           <h3>Here</h3>
-          {isUnclaimed && occupyingPlot && (
-            <button
-              className="crop-option"
-              disabled={(state.inventory.coin ?? 0) < world.homesteadCost || myPlotIds.length >= world.maxHomesteads}
-              onClick={() => handleClaim(occupyingPlot.id)}
-            >
-              🏡 Claim this homestead — {world.homesteadCost} <ItemIcon item="coin" />
-            </button>
-          )}
+          {isUnclaimed && occupyingPlot && (() => {
+            const tier = world.homesteadTiers[occupyingPlot.size];
+            const canAfford = (state.inventory.coin ?? 0) >= tier.cost;
+            const atCap = myPlotIds.length >= world.maxHomesteads;
+            return (
+              <button
+                className="crop-option"
+                disabled={!canAfford || atCap}
+                onClick={() => setClaimConfirmPlot(occupyingPlot)}
+              >
+                🏡 Claim this {tier.label} homestead — {tier.cost} <ItemIcon item="coin" />
+              </button>
+            );
+          })()}
           {isUnclaimed && myPlotIds.length >= world.maxHomesteads && (
             <p className="modal-note">You already own the max of {world.maxHomesteads} homesteads.</p>
           )}
@@ -555,6 +569,27 @@ export default function App() {
           <p className="controls-hint">Move with arrow keys or WASD</p>
         </div>
       </div>
+
+      {claimConfirmPlot && (() => {
+        const tier = world.homesteadTiers[claimConfirmPlot.size];
+        return (
+          <div className="modal-backdrop" onClick={() => setClaimConfirmPlot(null)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <h3>Confirm homestead purchase</h3>
+              <p className="modal-note">
+                {tier.label} homestead ({claimConfirmPlot.size}x{claimConfirmPlot.size}) — {tier.cost} coins
+              </p>
+              <p className="warning-note">
+                ⚠️ Homesteads can NEVER be sold, refunded, or exchanged once purchased. This is permanent.
+              </p>
+              <button className="sell-option" onClick={() => handleClaim(claimConfirmPlot.id)}>
+                Confirm purchase
+              </button>
+              <button className="cancel" onClick={() => setClaimConfirmPlot(null)}>Cancel</button>
+            </div>
+          </div>
+        );
+      })()}
 
       {tradeInvite && (
         <TradeInvitePrompt fromUsername={tradeInvite.fromUsername} onAccept={acceptInvite} onDecline={declineInvite} />

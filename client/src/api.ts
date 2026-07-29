@@ -80,7 +80,7 @@ export interface WorldConfig {
   shopLocation: { x: number; y: number; size: number };
   sellPrices: Record<string, number>;
   craftRecipes: Record<string, CraftRecipeConfig>;
-  homesteadCost: number;
+  homesteadTiers: Record<number, { label: string; cost: number }>;
   maxHomesteads: number;
 }
 
