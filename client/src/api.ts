@@ -76,7 +76,7 @@ export interface WorldConfig {
   crops: Record<string, CropConfig>;
   buildings: Record<string, BuildingConfig>;
   livestock: Record<string, LivestockConfig>;
-  shopLocation: { x: number; y: number };
+  shopLocation: { x: number; y: number; size: number };
   sellPrices: Record<string, number>;
   craftRecipes: Record<string, CraftRecipeConfig>;
   homesteadCost: number;

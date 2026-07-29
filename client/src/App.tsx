@@ -25,6 +25,12 @@ function chebyshev(ax: number, ay: number, bx: number, by: number) {
   return Math.max(Math.abs(ax - bx), Math.abs(ay - by));
 }
 
+function distToRect(px: number, py: number, rx: number, ry: number, size: number) {
+  const dx = Math.max(rx - px, 0, px - (rx + size - 1));
+  const dy = Math.max(ry - py, 0, py - (ry + size - 1));
+  return Math.max(dx, dy);
+}
+
 function plotAtClient(world: WorldConfig, x: number, y: number): PlotConfig | undefined {
   return world.plots.find((p) => x >= p.x && x < p.x + p.size && y >= p.y && y < p.y + p.size);
 }
@@ -184,6 +190,8 @@ export default function App() {
   useEffect(() => {
     if (!token || !state || !world) return;
     function onKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
       let dx = 0, dy = 0;
       if (e.key === 'ArrowUp' || e.key === 'w') dy = -1;
       else if (e.key === 'ArrowDown' || e.key === 's') dy = 1;
@@ -304,7 +312,7 @@ export default function App() {
   const livestockHere = state.livestock.find((a) => a.x === here.x && a.y === here.y);
   const nearbyNodes = state.resourceNodes.filter((n) => chebyshev(here.x, here.y, n.x, n.y) <= 1);
   const nearbyPlayers = state.players.filter((p) => p.id !== me.id && chebyshev(here.x, here.y, p.x, p.y) <= 1);
-  const nearShop = chebyshev(here.x, here.y, world.shopLocation.x, world.shopLocation.y) <= 1;
+  const nearShop = distToRect(here.x, here.y, world.shopLocation.x, world.shopLocation.y, world.shopLocation.size) <= 1;
 
   const myPlotIds = Object.entries(state.plotOwners).filter(([, o]) => o.ownerId === me.id).map(([id]) => id);
   const hasCabin = !!occupyingPlot && state.buildings.some((b) => b.plot_id === occupyingPlot.id && b.type === 'cabin');
@@ -332,51 +340,57 @@ export default function App() {
       )}
 
       <div className="game-layout">
-        <div
-          className="map-grid"
-          style={{ gridTemplateColumns: `repeat(${world.mapW}, ${CELL_PX}px)`, gridTemplateRows: `repeat(${world.mapH}, ${CELL_PX}px)` }}
-        >
-          {world.terrain.map((row, y) =>
-            row.map((terrain, x) => {
-              const plot = plotAtClient(world, x, y);
-              const owner = plot ? state.plotOwners[plot.id] : undefined;
-              const building = state.buildings.find((b) => b.x === x && b.y === y);
-              const crop = state.crops.find((c) => c.x === x && c.y === y);
-              const animal = state.livestock.find((a) => a.x === x && a.y === y);
-              const node = state.resourceNodes.find((n) => n.x === x && n.y === y);
-              const playersHere = state.players.filter((p) => p.x === x && p.y === y);
+        <div className="map-wrapper">
+          <div
+            className="map-grid"
+            style={{ gridTemplateColumns: `repeat(${world.mapW}, ${CELL_PX}px)`, gridTemplateRows: `repeat(${world.mapH}, ${CELL_PX}px)` }}
+          >
+            {world.terrain.map((row, y) =>
+              row.map((terrain, x) => {
+                const plot = plotAtClient(world, x, y);
+                const owner = plot ? state.plotOwners[plot.id] : undefined;
+                const building = state.buildings.find((b) => b.x === x && b.y === y);
+                const crop = state.crops.find((c) => c.x === x && c.y === y);
+                const animal = state.livestock.find((a) => a.x === x && a.y === y);
+                const node = state.resourceNodes.find((n) => n.x === x && n.y === y);
+                const playersHere = state.players.filter((p) => p.x === x && p.y === y);
+                const isShopTile = x >= world.shopLocation.x && x < world.shopLocation.x + world.shopLocation.size &&
+                  y >= world.shopLocation.y && y < world.shopLocation.y + world.shopLocation.size;
 
-              const cls = [
-                'cell',
-                terrain === 'water' && 'cell-water',
-                terrain === 'grass' && !plot && 'cell-grass',
-                plot && !owner && 'cell-plot-unclaimed',
-                plot && owner && owner.ownerId === me.id && 'cell-plot-mine',
-                plot && owner && owner.ownerId !== me.id && 'cell-plot-other',
-              ].filter(Boolean).join(' ');
+                const cls = [
+                  'cell',
+                  terrain === 'water' && 'cell-water',
+                  terrain === 'grass' && !plot && !isShopTile && 'cell-grass',
+                  isShopTile && 'cell-shop',
+                  plot && !owner && 'cell-plot-unclaimed',
+                  plot && owner && owner.ownerId === me.id && 'cell-plot-mine',
+                  plot && owner && owner.ownerId !== me.id && 'cell-plot-other',
+                ].filter(Boolean).join(' ');
 
-              let content: string | null = null;
-              if (x === world.shopLocation.x && y === world.shopLocation.y) content = '🏪';
-              else if (building) content = world.buildings[building.type]?.icon ?? '🏗️';
-              else if (animal) content = world.livestock[animal.type]?.icon ?? '🐾';
-              else if (crop) content = world.crops[crop.cropType]?.icon ?? '🌱';
-              else if (node) {
-                const nodeAvailable = node.depletedUntil <= Date.now();
-                content = node.type === 'wood' ? (nodeAvailable ? '🌲' : '🪵') : (nodeAvailable ? '🪨' : '⛏️');
-              }
+                let content: string | null = null;
+                const shopCenter = Math.floor(world.shopLocation.size / 2);
+                if (isShopTile && x === world.shopLocation.x + shopCenter && y === world.shopLocation.y + shopCenter) content = '🏪';
+                else if (building) content = world.buildings[building.type]?.icon ?? '🏗️';
+                else if (animal) content = world.livestock[animal.type]?.icon ?? '🐾';
+                else if (crop) content = world.crops[crop.cropType]?.icon ?? '🌱';
+                else if (node) {
+                  const nodeAvailable = node.depletedUntil <= Date.now();
+                  content = node.type === 'wood' ? (nodeAvailable ? '🌲' : '🪵') : (nodeAvailable ? '🪨' : '⛏️');
+                }
 
-              return (
-                <div key={`${x},${y}`} className={cls} title={`${x},${y}`}>
-                  {content && <span className="cell-icon">{content}</span>}
-                  {playersHere.map((p) => (
-                    <span key={p.id} className={`avatar ${p.id === me.id ? 'avatar-me' : ''}`} title={p.username}>
-                      {p.id === me.id ? '🤠' : '🧑\u200d🌾'}
-                    </span>
-                  ))}
-                </div>
-              );
-            })
-          )}
+                return (
+                  <div key={`${x},${y}`} className={cls} title={`${x},${y}`}>
+                    {content && <span className="cell-icon">{content}</span>}
+                    {playersHere.map((p) => (
+                      <span key={p.id} className={`avatar ${p.id === me.id ? 'avatar-me' : ''}`} title={p.username}>
+                        {p.id === me.id ? '🤠' : '🧑\u200d🌾'}
+                      </span>
+                    ))}
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
 
         <div className="side-panel">

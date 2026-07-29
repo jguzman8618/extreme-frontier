@@ -73,15 +73,36 @@ export const RESOURCE_NODES: ResourceNodeConfig[] = [
   { id: 'tree4', x: 5, y: 25, type: 'wood', respawnMs: 20_000, yieldAmount: 2 },
   { id: 'tree5', x: 12, y: 25, type: 'wood', respawnMs: 20_000, yieldAmount: 2 },
   { id: 'tree6', x: 26, y: 34, type: 'wood', respawnMs: 20_000, yieldAmount: 2 },
+  { id: 'tree7', x: 7, y: 3, type: 'wood', respawnMs: 20_000, yieldAmount: 2 },
+  { id: 'tree8', x: 22, y: 2, type: 'wood', respawnMs: 20_000, yieldAmount: 2 },
+  { id: 'tree9', x: 7, y: 12, type: 'wood', respawnMs: 20_000, yieldAmount: 2 },
+  { id: 'tree10', x: 22, y: 12, type: 'wood', respawnMs: 20_000, yieldAmount: 2 },
+  { id: 'tree11', x: 1, y: 21, type: 'wood', respawnMs: 20_000, yieldAmount: 2 },
+  { id: 'tree12', x: 25, y: 25, type: 'wood', respawnMs: 20_000, yieldAmount: 2 },
+  { id: 'tree13', x: 5, y: 35, type: 'wood', respawnMs: 20_000, yieldAmount: 2 },
+  { id: 'tree14', x: 22, y: 38, type: 'wood', respawnMs: 20_000, yieldAmount: 2 },
   { id: 'rock1', x: 16, y: 7, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
   { id: 'rock2', x: 26, y: 16, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
   { id: 'rock3', x: 16, y: 25, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
   { id: 'rock4', x: 5, y: 16, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
   { id: 'rock5', x: 26, y: 7, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
   { id: 'rock6', x: 25, y: 34, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'rock7', x: 14, y: 3, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'rock8', x: 35, y: 5, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'rock9', x: 12, y: 15, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'rock10', x: 35, y: 15, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'rock11', x: 14, y: 21, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'rock12', x: 35, y: 25, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'rock13', x: 15, y: 35, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
+  { id: 'rock14', x: 35, y: 35, type: 'stone', respawnMs: 30_000, yieldAmount: 2 },
 ];
 
-export const SHOP_LOCATION = { x: 18, y: 20 };
+export const SHOP_LOCATION = { x: 14, y: 16, size: 4 };
+
+function insideShop(x: number, y: number): boolean {
+  return x >= SHOP_LOCATION.x && x < SHOP_LOCATION.x + SHOP_LOCATION.size &&
+    y >= SHOP_LOCATION.y && y < SHOP_LOCATION.y + SHOP_LOCATION.size;
+}
 
 // Resource nodes relocate to a new random clear spot each time they're
 // depleted, instead of always respawning in the same place.
@@ -91,7 +112,7 @@ export function randomFreeResourceSpot(occupied: (x: number, y: number) => boole
     const y = 1 + Math.floor(Math.random() * (MAP_H - 2));
     if (!isWalkable(x, y)) continue;
     if (plotAt(x, y)) continue;
-    if (x === SHOP_LOCATION.x && y === SHOP_LOCATION.y) continue;
+    if (insideShop(x, y)) continue;
     if (occupied(x, y)) continue;
     return { x, y };
   }

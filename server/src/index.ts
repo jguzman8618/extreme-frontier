@@ -128,6 +128,12 @@ function chebyshev(ax: number, ay: number, bx: number, by: number) {
   return Math.max(Math.abs(ax - bx), Math.abs(ay - by));
 }
 
+function distToRect(px: number, py: number, rx: number, ry: number, size: number) {
+  const dx = Math.max(rx - px, 0, px - (rx + size - 1));
+  const dy = Math.max(ry - py, 0, py - (ry + size - 1));
+  return Math.max(dx, dy);
+}
+
 function hasBuilding(plotId: string, type: string): boolean {
   return !!db.prepare('SELECT 1 FROM buildings WHERE plot_id = ? AND type = ?').get(plotId, type);
 }
@@ -482,7 +488,7 @@ app.post('/api/shop/sell', authMiddleware, (req: Request, res: Response) => {
   const { item, qty } = req.body ?? {};
   const price = SELL_PRICES[item];
   if (!price || typeof qty !== 'number' || qty <= 0) return res.status(400).json({ error: 'invalid item or quantity' });
-  if (chebyshev(player.x, player.y, SHOP_LOCATION.x, SHOP_LOCATION.y) > 1) return res.status(400).json({ error: 'not near the store' });
+  if (distToRect(player.x, player.y, SHOP_LOCATION.x, SHOP_LOCATION.y, SHOP_LOCATION.size) > 1) return res.status(400).json({ error: 'not near the store' });
 
   const ok = removeItem(player.id, item, qty);
   if (!ok) return res.status(400).json({ error: `not enough ${item}` });
