@@ -14,10 +14,6 @@ import {
 } from './api';
 import { authenticateWithDiscord, isInsideDiscord } from './discord';
 
-// The server only recalculates and broadcasts a tile's `ready` flag when
-// another action (buy/plant/sell/harvest) happens to it — it doesn't push
-// updates on a timer. So we recompute readiness ourselves on every render
-// using the crop's grow time, rather than trusting that stale snapshot.
 function isTileReady(tile: ClientTile | undefined, state: GameState): boolean {
   if (!tile || !tile.cropType || !tile.plantedAt) return false;
   const cfg = state.crops[tile.cropType];
@@ -245,4 +241,42 @@ function tileTitle(tile: ClientTile | undefined, state: GameState): string {
   if (!tile.cropType) return 'Your land — click to plant';
   if (isTileReady(tile, state)) return 'Ready — click to harvest';
   const cfg = state.crops[tile.cropType];
-  const
+  const remainingMs = cfg.growTimeMs - (Date.now() - (tile.plantedAt ?? 0));
+  return `Growing ${cfg.name} — ready in ${Math.max(0, Math.ceil(remainingMs / 1000))}s`;
+}
+
+function LoginScreen({ onLoggedIn, error }: { onLoggedIn: (token: string) => void; error: string | null }) {
+  const [username, setUsername] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  async function submit() {
+    setBusy(true);
+    setLocalError(null);
+    try {
+      const { token } = await login(username);
+      onLoggedIn(token);
+    } catch (e: any) {
+      setLocalError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="login-screen">
+      <h1>Extreme Frontier</h1>
+      <p>Your Land. Your Legacy.</p>
+      <input
+        placeholder="Pick a username"
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && submit()}
+      />
+      <button disabled={busy || username.trim().length < 2} onClick={submit}>
+        {busy ? 'Loading…' : 'Enter the Frontier'}
+      </button>
+      {(localError || error) && <div className="error-banner">{localError || error}</div>}
+    </div>
+  );
+}
