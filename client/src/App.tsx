@@ -14,6 +14,17 @@ import {
 } from './api';
 import { authenticateWithDiscord, isInsideDiscord } from './discord';
 
+// The server only recalculates and broadcasts a tile's `ready` flag when
+// another action (buy/plant/sell/harvest) happens to it — it doesn't push
+// updates on a timer. So we recompute readiness ourselves on every render
+// using the crop's grow time, rather than trusting that stale snapshot.
+function isTileReady(tile: ClientTile | undefined, state: GameState): boolean {
+  if (!tile || !tile.cropType || !tile.plantedAt) return false;
+  const cfg = state.crops[tile.cropType];
+  if (!cfg) return false;
+  return Date.now() - tile.plantedAt >= cfg.growTimeMs;
+}
+
 export default function App() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('ef_token'));
   const [state, setState] = useState<GameState | null>(null);
@@ -23,8 +34,6 @@ export default function App() {
   const inDiscord = useMemo(() => isInsideDiscord(), []);
   const [discordAuthing, setDiscordAuthing] = useState(inDiscord);
 
-  // Running inside the Discord Activity iframe: authenticate with
-  // Discord automatically, no username screen needed.
   useEffect(() => {
     if (!inDiscord || token) return;
     authenticateWithDiscord()
@@ -37,13 +46,11 @@ export default function App() {
       .finally(() => setDiscordAuthing(false));
   }, [inDiscord, token]);
 
-  // re-render every second so "ready in Ns" countdowns stay live
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
   }, []);
 
-  // load state once we have a token
   useEffect(() => {
     if (!token) return;
     getState(token)
@@ -55,7 +62,6 @@ export default function App() {
       });
   }, [token]);
 
-  // live tile updates from other players (and our own actions)
   useEffect(() => {
     if (!token) return;
     const socket: Socket = io(API_BASE || undefined);
@@ -93,13 +99,13 @@ export default function App() {
         await refresh();
         return;
       }
-      if (tile.ownerId !== state.player.id) return; // someone else's land
-      if (tile.ready) {
+      if (tile.ownerId !== state.player.id) return;
+      if (isTileReady(tile, state)) {
         await harvestTile(token, x, y);
         await refresh();
         return;
       }
-      setSelected(tile); // owned, not ready yet: plant (if empty) and/or sell
+      setSelected(tile);
     } catch (e: any) {
       setError(e.message);
     }
@@ -170,13 +176,14 @@ export default function App() {
             const tile = tileMap.get(`${x},${y}`);
             const mine = tile?.ownerId === state.player.id;
             const owned = !!tile?.ownerId;
+            const ready = isTileReady(tile, state);
             const cls = [
               'tile',
               !owned && 'tile-empty',
               owned && !mine && 'tile-other',
               mine && !tile?.cropType && 'tile-mine',
-              mine && tile?.cropType && !tile.ready && 'tile-growing',
-              mine && tile?.ready && 'tile-ready',
+              mine && tile?.cropType && !ready && 'tile-growing',
+              mine && ready && 'tile-ready',
             ]
               .filter(Boolean)
               .join(' ');
@@ -236,44 +243,6 @@ function tileTitle(tile: ClientTile | undefined, state: GameState): string {
   if (!tile || !tile.ownerId) return `Empty — click to buy for $${state.tilePrice}`;
   if (tile.ownerId !== state.player.id) return "Someone else's land";
   if (!tile.cropType) return 'Your land — click to plant';
-  if (tile.ready) return 'Ready — click to harvest';
+  if (isTileReady(tile, state)) return 'Ready — click to harvest';
   const cfg = state.crops[tile.cropType];
-  const remainingMs = cfg.growTimeMs - (Date.now() - (tile.plantedAt ?? 0));
-  return `Growing ${cfg.name} — ready in ${Math.max(0, Math.ceil(remainingMs / 1000))}s`;
-}
-
-function LoginScreen({ onLoggedIn, error }: { onLoggedIn: (token: string) => void; error: string | null }) {
-  const [username, setUsername] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [localError, setLocalError] = useState<string | null>(null);
-
-  async function submit() {
-    setBusy(true);
-    setLocalError(null);
-    try {
-      const { token } = await login(username);
-      onLoggedIn(token);
-    } catch (e: any) {
-      setLocalError(e.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="login-screen">
-      <h1>Extreme Frontier</h1>
-      <p>Your Land. Your Legacy.</p>
-      <input
-        placeholder="Pick a username"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && submit()}
-      />
-      <button disabled={busy || username.trim().length < 2} onClick={submit}>
-        {busy ? 'Loading…' : 'Enter the Frontier'}
-      </button>
-      {(localError || error) && <div className="error-banner">{localError || error}</div>}
-    </div>
-  );
-}
+  const
