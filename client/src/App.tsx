@@ -3,7 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import {
   API_BASE, WorldConfig, GameState, PlotConfig,
   login, loginWithDiscord, getWorld, getState,
-  move, gather, claimPlot, nameFarm, buildBuilding, plantCrop, harvestCrop, sellToShop,
+  move, gather, claimPlot, nameFarm, buildBuilding, plantCrop, harvestCrop, sellToShop, craftItem,
 } from './api';
 import { authenticateWithDiscord, isInsideDiscord } from './discord';
 import { TradeInvitePrompt, TradeModal, TradeSessionState } from './TradeModal';
@@ -209,6 +209,11 @@ export default function App() {
     sellToShop(token, item, qty).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => setError(e.message));
   }, [token]);
 
+  const handleCraft = useCallback((recipeId: string) => {
+    if (!token) return;
+    craftItem(token, recipeId).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => setError(e.message));
+  }, [token]);
+
   const handleNameFarm = useCallback((plotId: string, name: string) => {
     if (!token) return;
     nameFarm(token, plotId, name).catch((e) => setError(e.message));
@@ -332,8 +337,12 @@ export default function App() {
         <div className="side-panel">
           <h3>Here</h3>
           {isUnclaimed && occupyingPlot && (
-            <button className="crop-option" onClick={() => handleClaim(occupyingPlot.id)}>
-              🏡 Claim this homestead
+            <button
+              className="crop-option"
+              disabled={(state.inventory.globcoin ?? 0) < world.homesteadCost}
+              onClick={() => handleClaim(occupyingPlot.id)}
+            >
+              🏡 Claim this homestead — {world.homesteadCost} <ItemIcon item="globcoin" />
             </button>
           )}
           {occupyingPlot && plotOwner && (
@@ -404,6 +413,16 @@ export default function App() {
               ))}
             </>
           )}
+
+          <h4>🔨 Craft</h4>
+          {Object.values(world.craftRecipes).map((r) => {
+            const affordable = Object.entries(r.inputs).every(([item, qty]) => (state.inventory[item] ?? 0) >= (qty as number));
+            return (
+              <button key={r.id} className="crop-option" disabled={!affordable} onClick={() => handleCraft(r.id)}>
+                {r.icon} {r.name} — needs {Object.entries(r.inputs).map(([i, q]) => `${q} ${i}`).join(', ')} → {r.outputQty}x
+              </button>
+            );
+          })}
 
           {nearShop && (
             <>

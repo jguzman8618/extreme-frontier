@@ -56,12 +56,12 @@ export interface PlotConfig {
 }
 
 export const PLOTS: PlotConfig[] = [
-  { id: 'plot1', x: 1, y: 8, size: 3 },
-  { id: 'plot2', x: 5, y: 1, size: 3 },
-  { id: 'plot3', x: 15, y: 12, size: 3 },
-  { id: 'plot4', x: 12, y: 1, size: 3 },
-  { id: 'plot5', x: 2, y: 14, size: 3 },
-  { id: 'plot6', x: 16, y: 8, size: 3 },
+  { id: 'plot1', x: 3, y: 0, size: 3 },
+  { id: 'plot2', x: 14, y: 0, size: 3 },
+  { id: 'plot3', x: 3, y: 9, size: 3 },
+  { id: 'plot4', x: 14, y: 9, size: 3 },
+  { id: 'plot5', x: 3, y: 16, size: 3 },
+  { id: 'plot6', x: 14, y: 16, size: 3 },
 ];
 
 export function plotAt(x: number, y: number): PlotConfig | undefined {
@@ -105,16 +105,40 @@ export const BUILDINGS: Record<string, BuildingConfig> = {
   well: { id: 'well', name: 'Well', icon: '⛲', cost: { stone: 6 } },
 };
 
-export const STARTING_INVENTORY: Record<string, number> = { wood: 5, stone: 2 };
+export const STARTING_INVENTORY: Record<string, number> = { wood: 5, stone: 2, globcoin: 50 };
 
-// ---------- General Store (sell goods for Glob Coins) ----------
+// ---------- Crafting (turn raw resources/crops into sellable goods) ----------
 
-export const SHOP_LOCATION = { x: 11, y: 4 };
+export interface CraftRecipeConfig {
+  id: string;
+  name: string;
+  icon: string;
+  inputs: Record<string, number>;
+  outputQty: number;
+}
+
+export const CRAFT_RECIPES: Record<string, CraftRecipeConfig> = {
+  tools: { id: 'tools', name: 'Tools', icon: '🛠️', inputs: { wood: 3, stone: 2 }, outputQty: 1 },
+  bread: { id: 'bread', name: 'Bread', icon: '🍞', inputs: { wheat: 3 }, outputQty: 2 },
+  furniture: { id: 'furniture', name: 'Furniture', icon: '🪑', inputs: { wood: 6 }, outputQty: 1 },
+};
+
+// ---------- Homesteading cost ----------
+// Priced so starting Glob Coins cover exactly one homestead — buying a
+// second means actually earning coins first, not just claiming freely.
+
+export const HOMESTEAD_COST = 50;
+
+// ---------- General Store ----------
+// Deliberately placed well away from every homestead plot so it's a real
+// trip, not something you can sell from your own porch. Only crafted
+// goods are sellable — raw gathered/farmed resources have to be turned
+// into something first.
+
+export const SHOP_LOCATION = { x: 11, y: 9 };
 
 export const SELL_PRICES: Record<string, number> = {
-  wood: 1,
-  stone: 1,
-  wheat: 2,
-  corn: 3,
-  potato: 3,
+  tools: 15,
+  bread: 4,
+  furniture: 10,
 };

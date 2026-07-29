@@ -11,7 +11,7 @@ import {
   MAP_W, MAP_H, terrainAt, isWalkable,
   RESOURCE_NODES, PLOTS, plotAt, plotCenter,
   CROPS, BUILDINGS, STARTING_INVENTORY,
-  SHOP_LOCATION, SELL_PRICES,
+  SHOP_LOCATION, SELL_PRICES, CRAFT_RECIPES, HOMESTEAD_COST,
 } from './world';
 import { PlayerRow, CropRow, BuildingRow, PlotOwnerRow } from './types';
 
@@ -205,6 +205,8 @@ app.get('/api/world', (_req: Request, res: Response) => {
     buildings: BUILDINGS,
     shopLocation: SHOP_LOCATION,
     sellPrices: SELL_PRICES,
+    craftRecipes: CRAFT_RECIPES,
+    homesteadCost: HOMESTEAD_COST,
   });
 });
 
@@ -276,9 +278,12 @@ app.post('/api/plots/:plotId/claim', authMiddleware, (req: Request, res: Respons
   const inside = player.x >= plot.x && player.x < plot.x + plot.size && player.y >= plot.y && player.y < plot.y + plot.size;
   if (!inside) return res.status(400).json({ error: 'stand on the plot to claim it' });
 
+  const paid = removeItem(player.id, 'globcoin', HOMESTEAD_COST);
+  if (!paid) return res.status(400).json({ error: `not enough Glob Coins (need ${HOMESTEAD_COST})` });
+
   db.prepare('INSERT INTO plot_owners (plot_id, owner_id, claimed_at) VALUES (?, ?, ?)').run(plot.id, player.id, Date.now());
   io.emit('plotUpdate', { plotId: plot.id, ownerId: player.id, username: player.username, farmName: null });
-  res.json({ ok: true });
+  res.json({ ok: true, inventory: getInventory(player.id) });
 });
 
 app.post('/api/plots/:plotId/name', authMiddleware, (req: Request, res: Response) => {
@@ -360,6 +365,27 @@ app.post('/api/crops/harvest', authMiddleware, (req: Request, res: Response) => 
   addItem(player.id, crop.crop_type, cfg.yieldAmount);
   db.prepare('DELETE FROM crops WHERE x = ? AND y = ?').run(x, y);
   io.emit('cropUpdate', { x, y, removed: true });
+  res.json({ inventory: getInventory(player.id) });
+});
+
+// ---------- crafting ----------
+// Turns raw resources/crops into goods the store will actually buy.
+// Crafting itself is free (no separate station/building required for v1) —
+// the cost is the raw materials it consumes.
+
+app.post('/api/craft', authMiddleware, (req: Request, res: Response) => {
+  const player = (req as any).player as PlayerRow;
+  const { recipeId } = req.body ?? {};
+  const recipe = CRAFT_RECIPES[recipeId];
+  if (!recipe) return res.status(400).json({ error: 'unknown recipe' });
+
+  const inv = getInventory(player.id);
+  for (const [item, qty] of Object.entries(recipe.inputs)) {
+    if ((inv[item] ?? 0) < qty) return res.status(400).json({ error: `not enough ${item}` });
+  }
+  for (const [item, qty] of Object.entries(recipe.inputs)) removeItem(player.id, item, qty);
+  addItem(player.id, recipe.id, recipe.outputQty);
+
   res.json({ inventory: getInventory(player.id) });
 });
 

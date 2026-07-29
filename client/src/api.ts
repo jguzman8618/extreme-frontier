@@ -62,6 +62,8 @@ export interface WorldConfig {
   buildings: Record<string, BuildingConfig>;
   shopLocation: { x: number; y: number };
   sellPrices: Record<string, number>;
+  craftRecipes: Record<string, { id: string; name: string; icon: string; inputs: Record<string, number>; outputQty: number }>;
+  homesteadCost: number;
 }
 
 export interface CropInstance {
@@ -141,3 +143,4 @@ export const buildBuilding = (token: string, x: number, y: number, type: string)
 export const plantCrop = (token: string, x: number, y: number, cropType: string) => post(token, '/api/crops/plant', { x, y, cropType });
 export const harvestCrop = (token: string, x: number, y: number) => post(token, '/api/crops/harvest', { x, y });
 export const sellToShop = (token: string, item: string, qty: number) => post(token, '/api/shop/sell', { item, qty });
+export const craftItem = (token: string, recipeId: string) => post(token, '/api/craft', { recipeId });
