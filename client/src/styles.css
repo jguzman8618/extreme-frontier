@@ -149,7 +149,7 @@ body {
 
 .map-grid {
   display: grid;
-  background: #1c140c;
+  background: #4a5c2a;
   padding: 4px;
   border-radius: 6px;
   border: 3px solid #6b4d2e;
@@ -172,7 +172,7 @@ body {
 .cell-path { background: #6b5638; }
 .cell-door { background: #7a5a2e; outline: 2px solid #f4d35e; outline-offset: -2px; }
 .cell-shop-counter { background: #4a3a5c; }
-.cell-shop-building { background: #6b4a35; border: 1px solid #4a3324; }
+.cell-shop-building { background: #6b4a35; }
 
 .cell-icon { font-size: 9px; line-height: 1; pointer-events: none; }
 .cell-icon-shop { font-size: 22px; line-height: 1; pointer-events: none; z-index: 2; }

@@ -463,6 +463,7 @@ export default function App() {
                 const isShopBuildingTile = !!world.building &&
                   x >= world.building.x && x < world.building.x + world.building.w &&
                   y >= world.building.y && y < world.building.y + world.building.h;
+                const isBuildingAnchor = !!world.building && x === world.building.x && y === world.building.y;
                 const playersHere = state.players.filter((p) => p.x === x && p.y === y);
 
                 let waterStyle: React.CSSProperties | undefined;
@@ -492,8 +493,17 @@ export default function App() {
                 ].filter(Boolean).join(' ');
 
                 let content: string | null = null;
-                if (isDoorTile) content = '🚪';
-                else if (isShopCounter) content = world.building?.icon ?? '🏪';
+                let iconStyle: React.CSSProperties | undefined;
+                if (isBuildingAnchor && world.building) {
+                  content = world.building.icon;
+                  const size = Math.min(world.building.w, world.building.h) * cellPx * 0.8;
+                  iconStyle = {
+                    fontSize: `${size}px`,
+                    transform: `translate(${(world.building.w - 1) * cellPx / 2}px, ${(world.building.h - 1) * cellPx / 2}px)`,
+                    zIndex: 2,
+                  };
+                } else if (isDoorTile) content = '🚪';
+                else if (isShopCounter) content = '🚪';
                 else if (decoration) content = decoration.icon;
                 else if (building) content = world.buildings[building.type]?.icon ?? '🏗️';
                 else if (animal) content = world.livestock[animal.type]?.icon ?? '🐾';
@@ -504,7 +514,7 @@ export default function App() {
 
                 return (
                   <div key={`${x},${y}`} className={cls} style={waterStyle} title={`${x},${y}`}>
-                    {content && <span className="cell-icon">{content}</span>}
+                    {content && <span className="cell-icon" style={iconStyle}>{content}</span>}
                     {playersHere.map((p) => (
                       <span key={p.id} className={`avatar ${p.id === me.id ? 'avatar-me' : ''}`} title={p.username}>
                         {p.id === me.id ? '🤠' : '🧑\u200d🌾'}
