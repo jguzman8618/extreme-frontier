@@ -188,9 +188,16 @@ export default function App() {
       setState((prev) => {
         if (!prev) return prev;
         if (id === prev.player.id) {
-          // My own move/travel — biome may have changed. Update both the
-          // player record AND my entry in the players list, since the map
-          // renders avatars from the players list, not from player directly.
+          if (biome === prev.player.biome) {
+            // Same-biome position confirmation for my own move — the local
+            // optimistic/revert system already tracks this precisely.
+            // Applying a delayed confirmation on top of it just overwrites
+            // a newer position with an older one, causing rubber-banding
+            // when moving faster than the round-trip time.
+            return prev;
+          }
+          // Biome changed (travel) — this has no local optimistic handling
+          // of its own, so apply it.
           const players = prev.players.map((p) => (p.id === id ? { ...p, x, y, biome } : p));
           return { ...prev, player: { ...prev.player, x, y, biome }, players };
         }
