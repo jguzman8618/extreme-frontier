@@ -95,7 +95,7 @@ export default function App() {
   const [tradeSession, setTradeSession] = useState<TradeSessionState | null>(null);
   const [tradeMessage, setTradeMessage] = useState<string | null>(null);
   const [pendingInviteTo, setPendingInviteTo] = useState<string | null>(null);
-  const [craftCategory, setCraftCategory] = useState<'food' | 'goods'>('food');
+  const [craftCategory, setCraftCategory] = useState<'food' | 'feast' | 'tools' | 'goods' | 'toolbox'>('food');
   const mapWrapperRef = useRef<HTMLDivElement>(null);
   const [cellPx, setCellPx] = useState(DEFAULT_CELL_PX);
   const [claimConfirmPlot, setClaimConfirmPlot] = useState<PlotConfig | null>(null);
@@ -681,39 +681,63 @@ export default function App() {
               : <p className="modal-note">{world.livestock[livestockHere.type]?.icon} {world.livestock[livestockHere.type]?.name} — produce ready in {Math.max(0, Math.ceil((world.livestock[livestockHere.type].produceTimeMs - (Date.now() - livestockHere.lastCollectedAt)) / 1000))}s</p>
           )}
 
+          {nearbyNodes.length > 0 && (
+            <>
+              <h4>Nearby resources</h4>
+              <div className="option-grid">
+                {nearbyNodes.map((n) => {
+                  const available = n.depletedUntil <= Date.now();
+                  return (
+                    <button key={n.id} className="crop-option" disabled={!available || !!pendingGatherId} onClick={() => handleGather(n.id)}>
+                      {n.icon} Gather {n.type} {!available && `(back in ${Math.max(0, Math.ceil((n.depletedUntil - Date.now()) / 1000))}s)`}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
           {isMyPlot && tileFree && (
             <>
               <h4>Build</h4>
-              {Object.values(world.buildings).map((b) => {
-                const affordable = Object.entries(b.cost).every(([item, qty]) => (state.inventory[item] ?? 0) >= (qty as number));
-                const locked = b.id !== 'cabin' && !hasCabin;
-                return (
-                  <button key={b.id} className="crop-option" disabled={!affordable || locked} onClick={() => handleBuild(here.x, here.y, b.id)}>
-                    {b.icon} {b.name} — {Object.entries(b.cost).map(([i, q]) => `${q} ${i}`).join(', ')}
-                    {locked && ' (needs Cabin)'}
-                  </button>
-                );
-              })}
+              <div className="option-grid">
+                {Object.values(world.buildings).map((b) => {
+                  const affordable = Object.entries(b.cost).every(([item, qty]) => (state.inventory[item] ?? 0) >= (qty as number));
+                  const locked = b.id !== 'cabin' && !hasCabin;
+                  return (
+                    <button key={b.id} className="crop-option" disabled={!affordable || locked} onClick={() => handleBuild(here.x, here.y, b.id)}>
+                      {b.icon} {b.name}
+                      <span className="option-sub">{Object.entries(b.cost).map(([i, q]) => `${q} ${i}`).join(', ')}{locked && ' — needs Cabin'}</span>
+                    </button>
+                  );
+                })}
+              </div>
 
               <h4>Plant {!hasShed && '(needs Shed)'}</h4>
-              {hasCabin && hasShed && Object.values(world.crops).map((c) => {
-                const affordable = (state.inventory.coin ?? 0) >= c.plantCost;
-                return (
-                  <button key={c.id} className="crop-option" disabled={!affordable} onClick={() => handlePlant(here.x, here.y, c.id)}>
-                    {c.icon} {c.name} — {c.plantCost} <ItemIcon item="coin" /> — grows {Math.round(c.growTimeMs / 1000)}s, yields {c.yieldAmount}
-                  </button>
-                );
-              })}
+              <div className="option-grid">
+                {hasCabin && hasShed && Object.values(world.crops).map((c) => {
+                  const affordable = (state.inventory.coin ?? 0) >= c.plantCost;
+                  return (
+                    <button key={c.id} className="crop-option" disabled={!affordable} onClick={() => handlePlant(here.x, here.y, c.id)}>
+                      {c.icon} {c.name}
+                      <span className="option-sub">{c.plantCost} coin — {Math.round(c.growTimeMs / 1000)}s, yields {c.yieldAmount}</span>
+                    </button>
+                  );
+                })}
+              </div>
 
               <h4>Livestock {!hasBarn && '(needs Barn)'}</h4>
-              {hasCabin && hasBarn && Object.values(world.livestock).map((l) => {
-                const affordable = (state.inventory.coin ?? 0) >= l.cost;
-                return (
-                  <button key={l.id} className="crop-option" disabled={!affordable} onClick={() => handleBuyLivestock(here.x, here.y, l.id)}>
-                    {l.icon} {l.name} — {l.cost} <ItemIcon item="coin" /> (produces {l.produceIcon} {l.produceItem})
-                  </button>
-                );
-              })}
+              <div className="option-grid">
+                {hasCabin && hasBarn && Object.values(world.livestock).map((l) => {
+                  const affordable = (state.inventory.coin ?? 0) >= l.cost;
+                  return (
+                    <button key={l.id} className="crop-option" disabled={!affordable} onClick={() => handleBuyLivestock(here.x, here.y, l.id)}>
+                      {l.icon} {l.name}
+                      <span className="option-sub">{l.cost} coin — makes {l.produceIcon} {l.produceItem}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </>
           )}
 
@@ -734,46 +758,36 @@ export default function App() {
                 );
               })()}
               <div className="craft-tabs">
-                <button
-                  className={`craft-tab ${craftCategory === 'food' ? 'craft-tab-active' : ''}`}
-                  onClick={() => setCraftCategory('food')}
-                >
-                  🍞 Food
-                </button>
-                <button
-                  className={`craft-tab ${craftCategory === 'goods' ? 'craft-tab-active' : ''}`}
-                  onClick={() => setCraftCategory('goods')}
-                >
-                  🛠️ Goods
-                </button>
-              </div>
-              {Object.values(world.craftRecipes)
-                .filter((r) => r.category === craftCategory)
-                .map((r) => ({
-                  r,
-                  affordable: Object.entries(r.inputs).every(([item, qty]) => (state.inventory[item] ?? 0) >= (qty as number)),
-                }))
-                .sort((a, b) => (a.affordable === b.affordable ? 0 : a.affordable ? -1 : 1))
-                .map(({ r, affordable }) => (
-                  <button key={r.id} className="crop-option" disabled={!affordable || !!state.craftJob} onClick={() => handleCraft(r.id)}>
-                    {r.icon} {r.name} — needs {Object.entries(r.inputs).map(([i, q]) => `${q} ${i}`).join(', ')} → {r.outputQty}x, takes {Math.round(r.craftTimeMs / 1000)}s
-                    {state.shopPrices[r.id] && ` (sells for ${state.shopPrices[r.id]})`}
+                {(['food', 'feast', 'tools', 'goods', 'toolbox'] as const).map((cat) => (
+                  <button
+                    key={cat}
+                    className={`craft-tab ${craftCategory === cat ? 'craft-tab-active' : ''}`}
+                    onClick={() => setCraftCategory(cat)}
+                  >
+                    {{ food: '🍞', feast: '🍲', tools: '🛠️', goods: '🪑', toolbox: '🧰' }[cat]} {cat[0].toUpperCase() + cat.slice(1)}
                   </button>
                 ))}
-            </>
-          )}
-
-          {nearbyNodes.length > 0 && (
-            <>
-              <h4>Nearby resources</h4>
-              {nearbyNodes.map((n) => {
-                const available = n.depletedUntil <= Date.now();
-                return (
-                  <button key={n.id} className="crop-option" disabled={!available || !!pendingGatherId} onClick={() => handleGather(n.id)}>
-                    {n.icon} Gather {n.type} {!available && `(back in ${Math.max(0, Math.ceil((n.depletedUntil - Date.now()) / 1000))}s)`}
-                  </button>
-                );
-              })}
+              </div>
+              <div className="option-grid">
+                {Object.values(world.craftRecipes)
+                  .filter((r) => r.category === craftCategory)
+                  .map((r) => ({
+                    r,
+                    affordable: Object.entries(r.inputs).every(([item, qty]) => (state.inventory[item] ?? 0) >= (qty as number)),
+                    discovered: Object.keys(r.inputs).some((item) => (state.inventory[item] ?? 0) > 0),
+                  }))
+                  .filter(({ affordable, discovered }) => affordable || discovered)
+                  .sort((a, b) => (a.affordable === b.affordable ? 0 : a.affordable ? -1 : 1))
+                  .map(({ r, affordable }) => (
+                    <button key={r.id} className="crop-option" disabled={!affordable || !!state.craftJob} onClick={() => handleCraft(r.id)}>
+                      {r.icon} {r.name}
+                      <span className="option-sub">
+                        {Object.entries(r.inputs).map(([i, q]) => `${q} ${i}`).join(', ')} → {r.outputQty}x, {Math.round(r.craftTimeMs / 1000)}s
+                        {state.shopPrices[r.id] && ` · sells ${state.shopPrices[r.id]}`}
+                      </span>
+                    </button>
+                  ))}
+              </div>
             </>
           )}
 

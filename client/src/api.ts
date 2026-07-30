@@ -77,7 +77,7 @@ export interface CraftRecipeConfig {
   id: string;
   name: string;
   icon: string;
-  category: 'food' | 'goods';
+  category: 'food' | 'feast' | 'tools' | 'goods' | 'toolbox';
   inputs: Record<string, number>;
   outputQty: number;
   craftTimeMs: number;
