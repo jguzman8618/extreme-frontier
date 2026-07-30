@@ -156,8 +156,11 @@ export default function App() {
       setState((prev) => {
         if (!prev) return prev;
         if (id === prev.player.id) {
-          // My own move/travel — biome may have changed.
-          return { ...prev, player: { ...prev.player, x, y, biome } };
+          // My own move/travel — biome may have changed. Update both the
+          // player record AND my entry in the players list, since the map
+          // renders avatars from the players list, not from player directly.
+          const players = prev.players.map((p) => (p.id === id ? { ...p, x, y, biome } : p));
+          return { ...prev, player: { ...prev.player, x, y, biome }, players };
         }
         const myBiome = prev.player.biome;
         if (biome !== myBiome) {

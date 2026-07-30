@@ -135,50 +135,94 @@ export const HOMESTEAD_BIOME: BiomeConfig = {
   terrainAt: homesteadTerrainAt,
   plots: HOMESTEAD_PLOTS,
   resourceNodes: HOMESTEAD_RESOURCE_NODES,
-  decorations: [],
+  decorations: [
+    { x: 5, y: 7, icon: '🍎', blocking: true },
+    { x: 15, y: 15, icon: '🍎', blocking: true },
+    { x: 26, y: 7, icon: '🍎', blocking: true },
+    { x: 15, y: 25, icon: '🍎', blocking: true },
+    { x: 6, y: 24, icon: '🍎', blocking: true },
+    { x: 36, y: 32, icon: '🍎', blocking: true },
+  ],
   paths: [],
   doors: { east: 'shop' },
   homesteadsAllowed: true,
 };
 
 // ==================== SHOP BIOME ====================
-// A dedicated plaza biome — no homesteads, nothing harvestable. One large
-// shop building in the center with a walkway leading to its front door.
-// Arriving from the Homestead lands you at the west door; a walkway leads
-// east to the building's door on its south side.
+// A dedicated plaza biome with its own harvestable wood/stone (worth the
+// trip out from the Homestead), a large shop building, a walkway to its
+// front door, and a decorative pond with a winding stream.
 
 const SHOP_MAP_W = 40;
 const SHOP_MAP_H = 40;
 
 // Building footprint (blocks movement) — the door itself is a separate
 // interactive tile just outside it, not part of the solid block.
-const SHOP_BUILDING = { x: 14, y: 12, w: 12, h: 10 };
-export const SHOP_DOOR = { x: 19, y: 22 }; // just south of the building
+const SHOP_BUILDING = { x: 15, y: 10, w: 10, h: 10 };
+export const SHOP_DOOR = { x: 19, y: 20 }; // just south of the building
 
-function shopTerrainAt(_x: number, _y: number): Terrain {
-  return 'grass';
+function buildShopPond(): { x: number; y: number }[] {
+  const tiles: { x: number; y: number }[] = [];
+  for (let x = 28; x <= 34; x++) {
+    for (let y = 4; y <= 9; y++) {
+      const dx = (x - 31) / 3;
+      const dy = (y - 6.5) / 2.5;
+      if (dx * dx + dy * dy <= 1) tiles.push({ x, y });
+    }
+  }
+  return tiles;
+}
+
+function buildShopStream(): { x: number; y: number }[] {
+  const tiles: { x: number; y: number }[] = [];
+  let sx = 31, sy = 10;
+  for (let i = 0; i < 20; i++) {
+    tiles.push({ x: sx, y: sy });
+    sy += 1;
+    if (i % 3 === 0) sx += i % 6 === 0 ? 1 : -1;
+  }
+  return tiles;
+}
+
+const SHOP_WATER = [...buildShopPond(), ...buildShopStream()];
+const SHOP_WATER_SET = new Set(SHOP_WATER.map((t) => `${t.x},${t.y}`));
+
+function shopTerrainAt(x: number, y: number): Terrain {
+  return SHOP_WATER_SET.has(`${x},${y}`) ? 'water' : 'grass';
 }
 
 function buildShopDecorations(): DecorationConfig[] {
   const deco: DecorationConfig[] = [];
-  // Scattered unharvestable trees and rocks around the plaza.
-  const trees = [[3, 3], [36, 3], [3, 36], [36, 36], [6, 30], [33, 8]];
-  const rocks = [[8, 4], [31, 34], [4, 20], [35, 20]];
-  for (const [x, y] of trees) deco.push({ x, y, icon: '🌲', blocking: true });
+  // Scenery around the pond, plus a windmill landmark.
+  const trees = [[27, 5], [35, 5], [27, 10], [35, 10]];
+  const rocks = [[29, 3], [33, 11]];
+  for (const [x, y] of trees) deco.push({ x, y, icon: '🌳', blocking: true });
   for (const [x, y] of rocks) deco.push({ x, y, icon: '🪨', blocking: true });
-  // A windmill as a plaza landmark.
-  deco.push({ x: 30, y: 6, icon: '🗼', blocking: true });
+  deco.push({ x: 8, y: 8, icon: '🗼', blocking: true });
   return deco;
 }
 
 function buildShopPaths(): { x: number; y: number }[] {
   const paths: { x: number; y: number }[] = [];
-  // West entry door (0,20) straight across to below the building, then
-  // down to the building's front door at (19,22).
-  for (let x = 0; x <= 19; x++) paths.push({ x, y: 20 });
-  for (let y = 20; y <= 22; y++) paths.push({ x: 19, y });
+  // Straight walkway from the west arrival door to the building's front door.
+  for (let x = 0; x <= SHOP_DOOR.x; x++) paths.push({ x, y: SHOP_DOOR.y });
   return paths;
 }
+
+export const SHOP_RESOURCE_NODES: ResourceNodeConfig[] = [
+  { id: 'shop_tree1', x: 5, y: 25, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'shop_tree2', x: 10, y: 32, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'shop_tree3', x: 25, y: 32, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'shop_tree4', x: 35, y: 30, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'shop_tree5', x: 3, y: 15, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'shop_tree6', x: 36, y: 20, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'shop_rock1', x: 8, y: 28, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'shop_rock2', x: 20, y: 35, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'shop_rock3', x: 30, y: 35, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'shop_rock4', x: 5, y: 10, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'shop_rock5', x: 12, y: 5, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'shop_rock6', x: 36, y: 25, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
+];
 
 export const SHOP_BIOME: BiomeConfig = {
   id: 'shop',
@@ -187,7 +231,7 @@ export const SHOP_BIOME: BiomeConfig = {
   mapH: SHOP_MAP_H,
   terrainAt: shopTerrainAt,
   plots: [],
-  resourceNodes: [],
+  resourceNodes: SHOP_RESOURCE_NODES,
   decorations: buildShopDecorations(),
   paths: buildShopPaths(),
   doors: { west: 'homestead' },
