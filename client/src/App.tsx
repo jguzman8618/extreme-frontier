@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import {
-  API_BASE, WorldConfig, GameState, PlotConfig,
+  API_BASE, WorldConfig, GameState, PlotConfig, Direction,
   login, loginWithDiscord, getWorld, getState,
-  move, gather, claimPlot, nameFarm, buildBuilding, plantCrop, harvestCrop,
+  move, travel, gather, claimPlot, nameFarm, buildBuilding, plantCrop, harvestCrop,
   sellToShop, craftItem, collectCraft, buyLivestock, collectLivestock,
 } from './api';
 import { authenticateWithDiscord, isInsideDiscord } from './discord';
@@ -25,12 +25,6 @@ function chebyshev(ax: number, ay: number, bx: number, by: number) {
   return Math.max(Math.abs(ax - bx), Math.abs(ay - by));
 }
 
-function distToRect(px: number, py: number, rx: number, ry: number, size: number) {
-  const dx = Math.max(rx - px, 0, px - (rx + size - 1));
-  const dy = Math.max(ry - py, 0, py - (ry + size - 1));
-  return Math.max(dx, dy);
-}
-
 function plotAtClient(world: WorldConfig, x: number, y: number): PlotConfig | undefined {
   return world.plots.find((p) => x >= p.x && x < p.x + p.size && y >= p.y && y < p.y + p.size);
 }
@@ -46,6 +40,19 @@ function isLivestockReady(animal: { type: string; lastCollectedAt: number }, wor
   if (!cfg) return false;
   return Date.now() - animal.lastCollectedAt >= cfg.produceTimeMs;
 }
+
+// Doors always sit at the midpoint of whichever edge they're on — must
+// match the server's doorPosition() logic exactly.
+function doorPositionClient(world: WorldConfig, dir: Direction): { x: number; y: number } {
+  const midX = Math.floor(world.mapW / 2);
+  const midY = Math.floor(world.mapH / 2);
+  if (dir === 'north') return { x: midX, y: 0 };
+  if (dir === 'south') return { x: midX, y: world.mapH - 1 };
+  if (dir === 'west') return { x: 0, y: midY };
+  return { x: world.mapW - 1, y: midY };
+}
+
+const DIRECTION_LABEL: Record<Direction, string> = { north: 'North', south: 'South', east: 'East', west: 'West' };
 
 const MIN_CELL_PX = 6;
 const DEFAULT_CELL_PX = 13;
@@ -89,8 +96,24 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    getWorld().then(setWorld).catch((e) => showError(e.message));
-  }, []);
+    if (!token) return;
+    getState(token)
+      .then(setState)
+      .catch((e) => {
+        showError(e.message);
+        setToken(null);
+        localStorage.removeItem('owf_token');
+      });
+  }, [token]);
+
+  // Fetch the current biome's world config whenever the player's biome
+  // changes (initial load, or after traveling through a door).
+  useEffect(() => {
+    if (!state) return;
+    const biome = state.player.biome;
+    if (world && world.biomeId === biome) return;
+    getWorld(biome).then(setWorld).catch((e) => showError(e.message));
+  }, [state?.player.biome]);
 
   useEffect(() => {
     if (!world) return;
@@ -116,35 +139,37 @@ export default function App() {
 
   useEffect(() => {
     if (!token) return;
-    getState(token)
-      .then(setState)
-      .catch((e) => {
-        showError(e.message);
-        setToken(null);
-        localStorage.removeItem('owf_token');
-      });
-  }, [token]);
-
-  useEffect(() => {
-    if (!token) return;
     const s: Socket = io(API_BASE || undefined);
     s.on('connect', () => s.emit('identify', token));
     setSocket(s);
 
-    s.on('playerJoined', (d: { id: string; username: string; x: number; y: number }) => {
+    s.on('playerJoined', (d: { id: string; username: string; x: number; y: number; biome: string }) => {
       setState((prev) => {
         if (!prev) return prev;
+        if (d.biome !== prev.player.biome) return prev;
         if (prev.players.some((p) => p.id === d.id)) return prev;
         return { ...prev, players: [...prev.players, d] };
       });
     });
 
-    s.on('playerMoved', ({ id, x, y }: { id: string; x: number; y: number }) => {
+    s.on('playerMoved', ({ id, x, y, biome, username }: { id: string; x: number; y: number; biome: string; username?: string }) => {
       setState((prev) => {
         if (!prev) return prev;
-        const players = prev.players.map((p) => (p.id === id ? { ...p, x, y } : p));
-        const player = prev.player.id === id ? { ...prev.player, x, y } : prev.player;
-        return { ...prev, players, player };
+        if (id === prev.player.id) {
+          // My own move/travel — biome may have changed.
+          return { ...prev, player: { ...prev.player, x, y, biome } };
+        }
+        const myBiome = prev.player.biome;
+        if (biome !== myBiome) {
+          // They're not in my biome (anymore, or never were) — make sure they're not shown.
+          if (!prev.players.some((p) => p.id === id)) return prev;
+          return { ...prev, players: prev.players.filter((p) => p.id !== id) };
+        }
+        const exists = prev.players.some((p) => p.id === id);
+        const players = exists
+          ? prev.players.map((p) => (p.id === id ? { ...p, x, y, biome } : p))
+          : [...prev.players, { id, username: username ?? '???', x, y, biome }];
+        return { ...prev, players };
       });
     });
 
@@ -308,6 +333,11 @@ export default function App() {
     collectLivestock(token, x, y).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => showError(e.message));
   }, [token]);
 
+  const handleTravel = useCallback((direction: Direction) => {
+    if (!token) return;
+    travel(token, direction).catch((e) => showError(e.message));
+  }, [token]);
+
   function requestTrade(targetId: string) {
     if (!socket) return;
     setPendingInviteTo(targetId);
@@ -361,9 +391,17 @@ export default function App() {
   const buildingHere = state.buildings.find((b) => b.x === here.x && b.y === here.y);
   const cropHere = state.crops.find((c) => c.x === here.x && c.y === here.y);
   const livestockHere = state.livestock.find((a) => a.x === here.x && a.y === here.y);
+  const decorationHere = world.decorations.find((d) => d.x === here.x && d.y === here.y);
   const nearbyNodes = state.resourceNodes.filter((n) => chebyshev(here.x, here.y, n.x, n.y) <= 1 && n.depletedUntil <= Date.now());
   const nearbyPlayers = state.players.filter((p) => p.id !== me.id && chebyshev(here.x, here.y, p.x, p.y) <= 1);
-  const nearShop = distToRect(here.x, here.y, world.shopLocation.x, world.shopLocation.y, world.shopLocation.size) <= 1;
+  const nearShop = world.biomeId === 'shop' && chebyshev(here.x, here.y, world.shopDoor.x, world.shopDoor.y) <= 1;
+
+  // Door detection: which direction (if any) is the player currently standing on?
+  const standingDoorDir = (Object.keys(world.doors) as Direction[]).find((dir) => {
+    const pos = doorPositionClient(world, dir);
+    return pos.x === here.x && pos.y === here.y;
+  });
+  const standingDoorDest = standingDoorDir ? world.doors[standingDoorDir] : undefined;
 
   const myPlotIds = Object.entries(state.plotOwners).filter(([, o]) => o.ownerId === me.id).map(([id]) => id);
   const hasCabin = !!occupyingPlot && state.buildings.some((b) => b.plot_id === occupyingPlot.id && b.type === 'cabin');
@@ -377,6 +415,7 @@ export default function App() {
         <h1>🤠 Extreme Frontier</h1>
         <div className="stats">
           <span className="username">{me.username}</span>
+          <span className="biome-pill">📍 {world.biomeName}</span>
           {Object.entries(state.inventory)
             .filter(([, qty]) => qty > 0)
             .map(([item, qty]) => (
@@ -404,23 +443,31 @@ export default function App() {
                 const crop = state.crops.find((c) => c.x === x && c.y === y);
                 const animal = state.livestock.find((a) => a.x === x && a.y === y);
                 const node = state.resourceNodes.find((n) => n.x === x && n.y === y);
+                const decoration = world.decorations.find((d) => d.x === x && d.y === y);
+                const isPath = world.paths.some((p) => p.x === x && p.y === y);
+                const isDoorTile = (Object.keys(world.doors) as Direction[]).some((dir) => {
+                  const pos = doorPositionClient(world, dir);
+                  return pos.x === x && pos.y === y;
+                });
+                const isShopCounter = world.biomeId === 'shop' && x === world.shopDoor.x && y === world.shopDoor.y;
                 const playersHere = state.players.filter((p) => p.x === x && p.y === y);
-                const isShopTile = x >= world.shopLocation.x && x < world.shopLocation.x + world.shopLocation.size &&
-                  y >= world.shopLocation.y && y < world.shopLocation.y + world.shopLocation.size;
 
                 const cls = [
                   'cell',
                   terrain === 'water' && 'cell-water',
-                  terrain === 'grass' && !plot && !isShopTile && 'cell-grass',
-                  isShopTile && 'cell-shop',
+                  terrain === 'grass' && !plot && !isPath && !isDoorTile && 'cell-grass',
+                  isPath && 'cell-path',
+                  isDoorTile && 'cell-door',
+                  isShopCounter && 'cell-shop-counter',
                   plot && !owner && 'cell-plot-unclaimed',
                   plot && owner && owner.ownerId === me.id && 'cell-plot-mine',
                   plot && owner && owner.ownerId !== me.id && 'cell-plot-other',
                 ].filter(Boolean).join(' ');
 
                 let content: string | null = null;
-                const showShopIcon = isShopTile && x === world.shopLocation.x && y === world.shopLocation.y;
-                if (showShopIcon) content = '🏪';
+                if (isDoorTile) content = '🚪';
+                else if (isShopCounter) content = '🏪';
+                else if (decoration) content = decoration.icon;
                 else if (building) content = world.buildings[building.type]?.icon ?? '🏗️';
                 else if (animal) content = world.livestock[animal.type]?.icon ?? '🐾';
                 else if (crop) content = world.crops[crop.cropType]?.icon ?? '🌱';
@@ -430,18 +477,7 @@ export default function App() {
 
                 return (
                   <div key={`${x},${y}`} className={cls} title={`${x},${y}`}>
-                    {content && (
-                      showShopIcon ? (
-                        <span
-                          className="cell-icon cell-icon-shop"
-                          style={{ transform: `translate(${(world.shopLocation.size - 1) * cellPx / 2}px, ${(world.shopLocation.size - 1) * cellPx / 2}px)` }}
-                        >
-                          {content}
-                        </span>
-                      ) : (
-                        <span className="cell-icon">{content}</span>
-                      )
-                    )}
+                    {content && <span className="cell-icon">{content}</span>}
                     {playersHere.map((p) => (
                       <span key={p.id} className={`avatar ${p.id === me.id ? 'avatar-me' : ''}`} title={p.username}>
                         {p.id === me.id ? '🤠' : '🧑\u200d🌾'}
@@ -456,6 +492,17 @@ export default function App() {
 
         <div className="side-panel">
           <h3>Here</h3>
+
+          {standingDoorDir && standingDoorDest && (
+            <button className="sell-option" onClick={() => handleTravel(standingDoorDir)}>
+              🚪 Travel {DIRECTION_LABEL[standingDoorDir]} to {standingDoorDest}?
+            </button>
+          )}
+
+          {decorationHere && (
+            <p className="modal-note">{decorationHere.icon} Just scenery — nothing to gather here.</p>
+          )}
+
           {isUnclaimed && occupyingPlot && (() => {
             const tier = world.homesteadTiers[occupyingPlot.size];
             const canAfford = (state.inventory.coin ?? 0) >= tier.cost;
@@ -538,47 +585,51 @@ export default function App() {
             </>
           )}
 
-          <h4>🔨 Craft</h4>
-          {state.craftJob && (() => {
-            const recipe = world.craftRecipes[state.craftJob.recipeId];
-            const ready = Date.now() - state.craftJob.startedAt >= recipe.craftTimeMs;
-            return ready ? (
-              <button className="crop-option" onClick={handleCollectCraft}>
-                {recipe.icon} Collect {recipe.name} ({recipe.outputQty}x)
-              </button>
-            ) : (
-              <p className="modal-note">
-                {recipe.icon} Crafting {recipe.name}… ready in {Math.max(0, Math.ceil((recipe.craftTimeMs - (Date.now() - state.craftJob.startedAt)) / 1000))}s
-              </p>
-            );
-          })()}
-          <div className="craft-tabs">
-            <button
-              className={`craft-tab ${craftCategory === 'food' ? 'craft-tab-active' : ''}`}
-              onClick={() => setCraftCategory('food')}
-            >
-              🍞 Food
-            </button>
-            <button
-              className={`craft-tab ${craftCategory === 'goods' ? 'craft-tab-active' : ''}`}
-              onClick={() => setCraftCategory('goods')}
-            >
-              🛠️ Goods
-            </button>
-          </div>
-          {Object.values(world.craftRecipes)
-            .filter((r) => r.category === craftCategory)
-            .map((r) => ({
-              r,
-              affordable: Object.entries(r.inputs).every(([item, qty]) => (state.inventory[item] ?? 0) >= (qty as number)),
-            }))
-            .sort((a, b) => (a.affordable === b.affordable ? 0 : a.affordable ? -1 : 1))
-            .map(({ r, affordable }) => (
-              <button key={r.id} className="crop-option" disabled={!affordable || !!state.craftJob} onClick={() => handleCraft(r.id)}>
-                {r.icon} {r.name} — needs {Object.entries(r.inputs).map(([i, q]) => `${q} ${i}`).join(', ')} → {r.outputQty}x, takes {Math.round(r.craftTimeMs / 1000)}s
-                {state.shopPrices[r.id] && ` (sells for ${state.shopPrices[r.id]})`}
-              </button>
-            ))}
+          {world.homesteadsAllowed && (
+            <>
+              <h4>🔨 Craft</h4>
+              {state.craftJob && (() => {
+                const recipe = world.craftRecipes[state.craftJob.recipeId];
+                const ready = Date.now() - state.craftJob.startedAt >= recipe.craftTimeMs;
+                return ready ? (
+                  <button className="crop-option" onClick={handleCollectCraft}>
+                    {recipe.icon} Collect {recipe.name} ({recipe.outputQty}x)
+                  </button>
+                ) : (
+                  <p className="modal-note">
+                    {recipe.icon} Crafting {recipe.name}… ready in {Math.max(0, Math.ceil((recipe.craftTimeMs - (Date.now() - state.craftJob.startedAt)) / 1000))}s
+                  </p>
+                );
+              })()}
+              <div className="craft-tabs">
+                <button
+                  className={`craft-tab ${craftCategory === 'food' ? 'craft-tab-active' : ''}`}
+                  onClick={() => setCraftCategory('food')}
+                >
+                  🍞 Food
+                </button>
+                <button
+                  className={`craft-tab ${craftCategory === 'goods' ? 'craft-tab-active' : ''}`}
+                  onClick={() => setCraftCategory('goods')}
+                >
+                  🛠️ Goods
+                </button>
+              </div>
+              {Object.values(world.craftRecipes)
+                .filter((r) => r.category === craftCategory)
+                .map((r) => ({
+                  r,
+                  affordable: Object.entries(r.inputs).every(([item, qty]) => (state.inventory[item] ?? 0) >= (qty as number)),
+                }))
+                .sort((a, b) => (a.affordable === b.affordable ? 0 : a.affordable ? -1 : 1))
+                .map(({ r, affordable }) => (
+                  <button key={r.id} className="crop-option" disabled={!affordable || !!state.craftJob} onClick={() => handleCraft(r.id)}>
+                    {r.icon} {r.name} — needs {Object.entries(r.inputs).map(([i, q]) => `${q} ${i}`).join(', ')} → {r.outputQty}x, takes {Math.round(r.craftTimeMs / 1000)}s
+                    {state.shopPrices[r.id] && ` (sells for ${state.shopPrices[r.id]})`}
+                  </button>
+                ))}
+            </>
+          )}
 
           {nearbyNodes.length > 0 && (
             <>

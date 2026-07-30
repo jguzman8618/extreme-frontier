@@ -1,30 +1,14 @@
-// ---------- World layout ----------
-// Bigger map, more room for a populated server: 16 homesteads, river
-// splitting east/west with two bridge crossings.
+// ---------- Biome architecture ----------
+// The game world is made of separate biome maps connected by doors at the
+// midpoint of each map's north/south/east/west edge. Only the door
+// directions listed in a biome's `doors` actually connect anywhere — the
+// rest are reserved for biomes not built yet. Coordinates are only
+// meaningful within a single biome; the same (x,y) exists independently
+// in every biome.
 
-export const MAP_W = 40;
-export const MAP_H = 40;
-
+export type BiomeId = 'homestead' | 'shop';
+export type Direction = 'north' | 'south' | 'east' | 'west';
 export type Terrain = 'grass' | 'water';
-
-const RIVER_X = [18, 19];
-const BRIDGES = [6, 24];
-
-export function terrainAt(x: number, y: number): Terrain {
-  const inRiver = x >= RIVER_X[0] && x <= RIVER_X[1];
-  if (inRiver && !BRIDGES.includes(y)) return 'water';
-  return 'grass';
-}
-
-export function isWalkable(x: number, y: number): boolean {
-  if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return false;
-  return terrainAt(x, y) !== 'water';
-}
-
-// ---------- Homestead plots ----------
-// Three sizes at three price points: Small (3x3) is what starting coins
-// cover; Medium (5x5) and Large (7x7) require actually earning more.
-// 16 plots total: 8 small, 6 medium, 2 large, mirrored west/east.
 
 export interface PlotConfig {
   id: string;
@@ -33,7 +17,66 @@ export interface PlotConfig {
   size: number;
 }
 
-export const PLOTS: PlotConfig[] = [
+export interface ResourceNodeConfig {
+  id: string;
+  x: number;
+  y: number;
+  type: 'wood' | 'stone';
+  respawnMs: number;
+  yieldAmount: number;
+}
+
+export interface DecorationConfig {
+  x: number;
+  y: number;
+  icon: string;
+  blocking: boolean;
+}
+
+export interface BiomeConfig {
+  id: BiomeId;
+  name: string;
+  mapW: number;
+  mapH: number;
+  terrainAt: (x: number, y: number) => Terrain;
+  plots: PlotConfig[];
+  resourceNodes: ResourceNodeConfig[];
+  decorations: DecorationConfig[];
+  paths: { x: number; y: number }[];
+  doors: Partial<Record<Direction, BiomeId>>;
+  homesteadsAllowed: boolean;
+}
+
+const OPPOSITE: Record<Direction, Direction> = { north: 'south', south: 'north', east: 'west', west: 'east' };
+export function oppositeDirection(dir: Direction): Direction {
+  return OPPOSITE[dir];
+}
+
+export function doorPosition(biome: BiomeConfig, dir: Direction): { x: number; y: number } {
+  const midX = Math.floor(biome.mapW / 2);
+  const midY = Math.floor(biome.mapH / 2);
+  if (dir === 'north') return { x: midX, y: 0 };
+  if (dir === 'south') return { x: midX, y: biome.mapH - 1 };
+  if (dir === 'west') return { x: 0, y: midY };
+  return { x: biome.mapW - 1, y: midY };
+}
+
+// ==================== HOMESTEAD BIOME ====================
+// The starting biome — old-west homestead sim. This is the center of the
+// eventual 3x3 biome grid; a door on its east edge leads to the Shop.
+
+const HOME_MAP_W = 40;
+const HOME_MAP_H = 40;
+const HOME_RIVER_X = [18, 19];
+const HOME_BRIDGES = [6, 24];
+
+function homesteadTerrainAt(x: number, y: number): Terrain {
+  const inRiver = x >= HOME_RIVER_X[0] && x <= HOME_RIVER_X[1];
+  if (inRiver && !HOME_BRIDGES.includes(y)) return 'water';
+  return 'grass';
+}
+
+export const HOMESTEAD_PLOTS: PlotConfig[] = [
   { id: 'plot1', x: 2, y: 1, size: 3 }, { id: 'plot2', x: 9, y: 1, size: 5 },
   { id: 'plot3', x: 22, y: 1, size: 5 }, { id: 'plot4', x: 29, y: 1, size: 3 },
   { id: 'plot5', x: 2, y: 8, size: 5 }, { id: 'plot6', x: 9, y: 8, size: 3 },
@@ -46,11 +89,6 @@ export const PLOTS: PlotConfig[] = [
   { id: 'plot19', x: 22, y: 33, size: 5 }, { id: 'plot20', x: 29, y: 33, size: 3 },
 ];
 
-// ---------- Homestead pricing tiers ----------
-// Keyed by plot size. Smallest tier matches starting coins exactly —
-// everything bigger has to be earned. Homesteads can never be sold once
-// bought; the client is required to show that plainly before purchase.
-
 export const HOMESTEAD_TIERS: Record<number, { label: string; cost: number }> = {
   3: { label: 'Small', cost: 1000 },
   5: { label: 'Medium', cost: 2500 },
@@ -58,32 +96,7 @@ export const HOMESTEAD_TIERS: Record<number, { label: string; cost: number }> = 
 };
 export const MAX_HOMESTEADS_PER_PLAYER = 3;
 
-export function plotAt(x: number, y: number): PlotConfig | undefined {
-  return PLOTS.find((p) => x >= p.x && x < p.x + p.size && y >= p.y && y < p.y + p.size);
-}
-
-export function plotCenter(p: PlotConfig): { x: number; y: number } {
-  const c = Math.floor(p.size / 2);
-  return { x: p.x + c, y: p.y + c };
-}
-
-// ---------- Gatherable resource nodes ----------
-
-export type ResourceType = 'wood' | 'stone';
-
-export interface ResourceNodeConfig {
-  id: string;
-  x: number;
-  y: number;
-  type: ResourceType;
-  respawnMs: number;
-  yieldAmount: number;
-}
-
-// Placed in the gaps between homestead rows/columns — verified clear of
-// every plot and the river. Respawn times are deliberately long — this is
-// a long-term game, not a fast-money one. Stone is scarcer than wood.
-export const RESOURCE_NODES: ResourceNodeConfig[] = [
+export const HOMESTEAD_RESOURCE_NODES: ResourceNodeConfig[] = [
   { id: 'tree1', x: 2, y: 5, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
   { id: 'tree2', x: 14, y: 5, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
   { id: 'tree3', x: 31, y: 5, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
@@ -114,26 +127,112 @@ export const RESOURCE_NODES: ResourceNodeConfig[] = [
   { id: 'rock14', x: 6, y: 24, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
 ];
 
-export const SHOP_LOCATION = { x: 16, y: 12, size: 2 };
+export const HOMESTEAD_BIOME: BiomeConfig = {
+  id: 'homestead',
+  name: 'Homestead',
+  mapW: HOME_MAP_W,
+  mapH: HOME_MAP_H,
+  terrainAt: homesteadTerrainAt,
+  plots: HOMESTEAD_PLOTS,
+  resourceNodes: HOMESTEAD_RESOURCE_NODES,
+  decorations: [],
+  paths: [],
+  doors: { east: 'shop' },
+  homesteadsAllowed: true,
+};
 
-function insideShop(x: number, y: number): boolean {
-  return x >= SHOP_LOCATION.x && x < SHOP_LOCATION.x + SHOP_LOCATION.size &&
-    y >= SHOP_LOCATION.y && y < SHOP_LOCATION.y + SHOP_LOCATION.size;
+// ==================== SHOP BIOME ====================
+// A dedicated plaza biome — no homesteads, nothing harvestable. One large
+// shop building in the center with a walkway leading to its front door.
+// Arriving from the Homestead lands you at the west door; a walkway leads
+// east to the building's door on its south side.
+
+const SHOP_MAP_W = 40;
+const SHOP_MAP_H = 40;
+
+// Building footprint (blocks movement) — the door itself is a separate
+// interactive tile just outside it, not part of the solid block.
+const SHOP_BUILDING = { x: 14, y: 12, w: 12, h: 10 };
+export const SHOP_DOOR = { x: 19, y: 22 }; // just south of the building
+
+function shopTerrainAt(_x: number, _y: number): Terrain {
+  return 'grass';
 }
 
-// Resource nodes relocate to a new random clear spot each time they're
-// depleted, instead of always respawning in the same place.
-export function randomFreeResourceSpot(occupied: (x: number, y: number) => boolean): { x: number; y: number } {
+function buildShopDecorations(): DecorationConfig[] {
+  const deco: DecorationConfig[] = [];
+  // Scattered unharvestable trees and rocks around the plaza.
+  const trees = [[3, 3], [36, 3], [3, 36], [36, 36], [6, 30], [33, 8]];
+  const rocks = [[8, 4], [31, 34], [4, 20], [35, 20]];
+  for (const [x, y] of trees) deco.push({ x, y, icon: '🌲', blocking: true });
+  for (const [x, y] of rocks) deco.push({ x, y, icon: '🪨', blocking: true });
+  // A windmill as a plaza landmark.
+  deco.push({ x: 30, y: 6, icon: '🗼', blocking: true });
+  return deco;
+}
+
+function buildShopPaths(): { x: number; y: number }[] {
+  const paths: { x: number; y: number }[] = [];
+  // West entry door (0,20) straight across to below the building, then
+  // down to the building's front door at (19,22).
+  for (let x = 0; x <= 19; x++) paths.push({ x, y: 20 });
+  for (let y = 20; y <= 22; y++) paths.push({ x: 19, y });
+  return paths;
+}
+
+export const SHOP_BIOME: BiomeConfig = {
+  id: 'shop',
+  name: 'General Store',
+  mapW: SHOP_MAP_W,
+  mapH: SHOP_MAP_H,
+  terrainAt: shopTerrainAt,
+  plots: [],
+  resourceNodes: [],
+  decorations: buildShopDecorations(),
+  paths: buildShopPaths(),
+  doors: { west: 'homestead' },
+  homesteadsAllowed: false,
+};
+
+export const BIOMES: Record<BiomeId, BiomeConfig> = {
+  homestead: HOMESTEAD_BIOME,
+  shop: SHOP_BIOME,
+};
+
+export function isInsideBuilding(x: number, y: number, b: { x: number; y: number; w: number; h: number }): boolean {
+  return x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h;
+}
+
+export function plotAt(biome: BiomeId, x: number, y: number): PlotConfig | undefined {
+  return BIOMES[biome].plots.find((p) => x >= p.x && x < p.x + p.size && y >= p.y && y < p.y + p.size);
+}
+
+export function plotCenter(p: PlotConfig): { x: number; y: number } {
+  const c = Math.floor(p.size / 2);
+  return { x: p.x + c, y: p.y + c };
+}
+
+export function isWalkable(biome: BiomeId, x: number, y: number): boolean {
+  const b = BIOMES[biome];
+  if (x < 0 || y < 0 || x >= b.mapW || y >= b.mapH) return false;
+  if (b.terrainAt(x, y) === 'water') return false;
+  if (biome === 'shop' && isInsideBuilding(x, y, SHOP_BUILDING)) return false;
+  if (b.decorations.some((d) => d.blocking && d.x === x && d.y === y)) return false;
+  return true;
+}
+
+export function randomFreeResourceSpot(biome: BiomeId, occupied: (x: number, y: number) => boolean): { x: number; y: number } {
+  const b = BIOMES[biome];
   for (let attempt = 0; attempt < 500; attempt++) {
-    const x = 1 + Math.floor(Math.random() * (MAP_W - 2));
-    const y = 1 + Math.floor(Math.random() * (MAP_H - 2));
-    if (!isWalkable(x, y)) continue;
-    if (plotAt(x, y)) continue;
-    if (insideShop(x, y)) continue;
+    const x = 1 + Math.floor(Math.random() * (b.mapW - 2));
+    const y = 1 + Math.floor(Math.random() * (b.mapH - 2));
+    if (!isWalkable(biome, x, y)) continue;
+    if (plotAt(biome, x, y)) continue;
     if (occupied(x, y)) continue;
     return { x, y };
   }
-  return { x: RESOURCE_NODES[0].x, y: RESOURCE_NODES[0].y };
+  const fallback = b.resourceNodes[0];
+  return { x: fallback.x, y: fallback.y };
 }
 
 // ---------- Crops (planted on your own plot's soil tiles) ----------
@@ -192,7 +291,7 @@ export const LIVESTOCK: Record<string, LivestockConfig> = {
 
 export const STARTING_INVENTORY: Record<string, number> = { wood: 5, stone: 2, coin: 1000 };
 
-// ---------- Crafting (turn raw resources/crops/animal goods into sellable items) ----------
+// ---------- Crafting ----------
 
 export interface CraftRecipeConfig {
   id: string;
@@ -205,7 +304,6 @@ export interface CraftRecipeConfig {
 }
 
 export const CRAFT_RECIPES: Record<string, CraftRecipeConfig> = {
-  // --- Tier 1: one resource type ---
   tools: { id: 'tools', name: 'Tools', icon: '🛠️', category: 'goods', inputs: { wood: 3, stone: 2 }, outputQty: 1, craftTimeMs: 45_000 },
   bread: { id: 'bread', name: 'Bread', icon: '🍞', category: 'food', inputs: { wheat: 3 }, outputQty: 2, craftTimeMs: 20_000 },
   furniture: { id: 'furniture', name: 'Furniture', icon: '🪑', category: 'goods', inputs: { wood: 6 }, outputQty: 1, craftTimeMs: 45_000 },
@@ -214,18 +312,12 @@ export const CRAFT_RECIPES: Record<string, CraftRecipeConfig> = {
   omelette: { id: 'omelette', name: 'Omelette', icon: '🍳', category: 'food', inputs: { egg: 2 }, outputQty: 1, craftTimeMs: 20_000 },
   cornbread: { id: 'cornbread', name: 'Cornbread', icon: '🌽', category: 'food', inputs: { corn: 3 }, outputQty: 2, craftTimeMs: 30_000 },
   fries: { id: 'fries', name: 'Fries', icon: '🍟', category: 'food', inputs: { potato: 3 }, outputQty: 2, craftTimeMs: 30_000 },
-
-  // --- Tier 2: multiple different materials — worth trading for ---
   wagonWheel: { id: 'wagonWheel', name: 'Wagon Wheel', icon: '🛞', category: 'goods', inputs: { wood: 4, stone: 3 }, outputQty: 1, craftTimeMs: 60_000 },
   toolbox: { id: 'toolbox', name: 'Toolbox', icon: '🧰', category: 'goods', inputs: { tools: 2, furniture: 1 }, outputQty: 1, craftTimeMs: 90_000 },
   feast: { id: 'feast', name: 'Feast', icon: '🍲', category: 'food', inputs: { bread: 2, cheese: 1, omelette: 1 }, outputQty: 1, craftTimeMs: 75_000 },
 };
 
-// ---------- General Store ----------
-// Base prices before supply/demand adjustment. Crafted goods sell for
-// real money; raw crops too but only 1 coin each. Tools/Furniture/Wagon
-// Wheel/Toolbox were previously too cheap to make and sold for too much —
-// lowered now that crafting actually costs real time.
+// ---------- General Store (only usable while in the Shop biome) ----------
 
 export const SELL_PRICES: Record<string, number> = {
   tools: 2,
@@ -244,10 +336,5 @@ export const SELL_PRICES: Record<string, number> = {
   feast: 12,
 };
 
-// ---------- Supply and demand ----------
-// Every unit sold nudges that item's price down; it recovers back toward
-// base price over real time if nobody's selling it. Keeps one player from
-// crashing the market by dumping everything they made.
-
-export const DEMAND_STEP = 3; // price drops 1 coin per this many units sold
-export const DEMAND_RECOVERY_MS = 120_000; // 1 unit of "sold pressure" recovers every 2 min
+export const DEMAND_STEP = 3;
+export const DEMAND_RECOVERY_MS = 120_000;

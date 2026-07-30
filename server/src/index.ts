@@ -9,13 +9,12 @@ import { randomUUID } from 'crypto';
 import db from './db';
 import { containsForbiddenWord } from './moderation';
 import {
-  MAP_W, MAP_H, terrainAt, isWalkable,
-  RESOURCE_NODES, randomFreeResourceSpot,
-  PLOTS, plotAt,
+  BiomeId, Direction, BIOMES, doorPosition, oppositeDirection,
+  plotAt, plotCenter, isWalkable, randomFreeResourceSpot,
   CROPS, BUILDINGS, LIVESTOCK, STARTING_INVENTORY,
-  SHOP_LOCATION, SELL_PRICES, CRAFT_RECIPES,
-  HOMESTEAD_TIERS, MAX_HOMESTEADS_PER_PLAYER,
-  DEMAND_STEP, DEMAND_RECOVERY_MS,
+  SELL_PRICES, CRAFT_RECIPES, DEMAND_STEP, DEMAND_RECOVERY_MS,
+  HOMESTEAD_TIERS, MAX_HOMESTEADS_PER_PLAYER, SHOP_DOOR,
+  PlotConfig,
 } from './world';
 import { PlayerRow, CropRow, BuildingRow } from './types';
 
@@ -57,8 +56,9 @@ function removeItem(playerId: string, item: string, qty: number): boolean {
   return true;
 }
 
-function allPlayersPublic() {
-  return db.prepare('SELECT id, username, x, y FROM players').all() as Pick<PlayerRow, 'id' | 'username' | 'x' | 'y'>[];
+function allPlayersInBiome(biome: string) {
+  return db.prepare('SELECT id, username, x, y, biome FROM players WHERE biome = ?').all(biome) as
+    Pick<PlayerRow, 'id' | 'username' | 'x' | 'y' | 'biome'>[];
 }
 
 function allPlotOwners(): Record<string, { ownerId: string; username: string; farmName: string | null }> {
@@ -71,12 +71,12 @@ function allPlotOwners(): Record<string, { ownerId: string; username: string; fa
   return out;
 }
 
-function allBuildings(): BuildingRow[] {
-  return db.prepare('SELECT * FROM buildings').all() as BuildingRow[];
+function allBuildingsInBiome(biome: string): BuildingRow[] {
+  return db.prepare('SELECT * FROM buildings WHERE biome = ?').all(biome) as BuildingRow[];
 }
 
-function allCrops() {
-  const rows = db.prepare('SELECT * FROM crops').all() as CropRow[];
+function allCropsInBiome(biome: string) {
+  const rows = db.prepare('SELECT * FROM crops WHERE biome = ?').all(biome) as CropRow[];
   return rows.map((r) => {
     const cfg = CROPS[r.crop_type];
     const ready = !!cfg && Date.now() - r.planted_at >= cfg.growTimeMs;
@@ -84,9 +84,9 @@ function allCrops() {
   });
 }
 
-interface LivestockRow { x: number; y: number; plot_id: string; owner_id: string; type: string; last_collected_at: number }
-function allLivestock() {
-  const rows = db.prepare('SELECT * FROM livestock').all() as LivestockRow[];
+interface LivestockRow { biome: string; x: number; y: number; plot_id: string; owner_id: string; type: string; last_collected_at: number }
+function allLivestockInBiome(biome: string) {
+  const rows = db.prepare('SELECT * FROM livestock WHERE biome = ?').all(biome) as LivestockRow[];
   return rows.map((r) => {
     const cfg = LIVESTOCK[r.type];
     const ready = !!cfg && Date.now() - r.last_collected_at >= cfg.produceTimeMs;
@@ -100,29 +100,35 @@ function seedResourceState(nodeId: string, defaultX: number, defaultY: number) {
     db.prepare('INSERT INTO resource_state (node_id, x, y, depleted_until) VALUES (?, ?, ?, 0)').run(nodeId, defaultX, defaultY);
   }
 }
-for (const n of RESOURCE_NODES) seedResourceState(n.id, n.x, n.y);
+for (const biome of Object.values(BIOMES)) {
+  for (const n of biome.resourceNodes) seedResourceState(n.id, n.x, n.y);
+}
 
-function resourceNodeStates() {
+function resourceNodeStatesForBiome(biomeId: BiomeId) {
+  const nodes = BIOMES[biomeId].resourceNodes;
+  if (nodes.length === 0) return [];
   const rows = db.prepare('SELECT * FROM resource_state').all() as { node_id: string; x: number; y: number; depleted_until: number }[];
   const byId: Record<string, { x: number; y: number; depleted_until: number }> = {};
   for (const r of rows) byId[r.node_id] = r;
-  return RESOURCE_NODES.map((n) => {
+  return nodes.map((n) => {
     const state = byId[n.id] ?? { x: n.x, y: n.y, depleted_until: 0 };
     return { ...n, x: state.x, y: state.y, depletedUntil: state.depleted_until, available: state.depleted_until <= Date.now() };
   });
 }
 
-function currentResourcePositions(): Record<string, { x: number; y: number }> {
+function currentResourcePositions(biomeId: BiomeId): Record<string, { x: number; y: number }> {
+  const nodeIds = new Set(BIOMES[biomeId].resourceNodes.map((n) => n.id));
   const rows = db.prepare('SELECT node_id, x, y FROM resource_state').all() as { node_id: string; x: number; y: number }[];
   const out: Record<string, { x: number; y: number }> = {};
-  for (const r of rows) out[r.node_id] = { x: r.x, y: r.y };
+  for (const r of rows) if (nodeIds.has(r.node_id)) out[r.node_id] = { x: r.x, y: r.y };
   return out;
 }
 
-function findSpawnPoint(): { x: number; y: number } {
-  let x = Math.floor(MAP_W / 2);
-  let y = Math.floor(MAP_H / 2);
-  for (let r = 0; r < 20 && !isWalkable(x, y); r++) x += 1;
+function findSpawnPoint(biomeId: BiomeId): { x: number; y: number } {
+  const b = BIOMES[biomeId];
+  let x = Math.floor(b.mapW / 2);
+  let y = Math.floor(b.mapH / 2);
+  for (let r = 0; r < 20 && !isWalkable(biomeId, x, y); r++) x += 1;
   return { x, y };
 }
 
@@ -136,21 +142,27 @@ function distToRect(px: number, py: number, rx: number, ry: number, size: number
   return Math.max(dx, dy);
 }
 
-function hasBuilding(plotId: string, type: string): boolean {
-  return !!db.prepare('SELECT 1 FROM buildings WHERE plot_id = ? AND type = ?').get(plotId, type);
+function hasBuilding(biome: string, plotId: string, type: string): boolean {
+  return !!db.prepare('SELECT 1 FROM buildings WHERE biome = ? AND plot_id = ? AND type = ?').get(biome, plotId, type);
 }
 
-function tileOccupied(x: number, y: number): boolean {
+function tileOccupied(biome: string, x: number, y: number): boolean {
   return !!(
-    db.prepare('SELECT 1 FROM buildings WHERE x = ? AND y = ?').get(x, y) ||
-    db.prepare('SELECT 1 FROM crops WHERE x = ? AND y = ?').get(x, y) ||
-    db.prepare('SELECT 1 FROM livestock WHERE x = ? AND y = ?').get(x, y)
+    db.prepare('SELECT 1 FROM buildings WHERE biome = ? AND x = ? AND y = ?').get(biome, x, y) ||
+    db.prepare('SELECT 1 FROM crops WHERE biome = ? AND x = ? AND y = ?').get(biome, x, y) ||
+    db.prepare('SELECT 1 FROM livestock WHERE biome = ? AND x = ? AND y = ?').get(biome, x, y)
   );
 }
 
+function findPlotById(plotId: string): { plot: PlotConfig; biome: BiomeId } | undefined {
+  for (const biomeId of Object.keys(BIOMES) as BiomeId[]) {
+    const p = BIOMES[biomeId].plots.find((pl) => pl.id === plotId);
+    if (p) return { plot: p, biome: biomeId };
+  }
+  return undefined;
+}
+
 // ---------- supply and demand pricing ----------
-// sold_units decays back toward 0 over real time; the more of an item
-// sitting in "recently sold" pressure, the lower its price.
 
 function decayedSoldUnits(item: string, now: number): number {
   const row = db.prepare('SELECT sold_units, last_update FROM market_state WHERE item = ?').get(item) as
@@ -208,13 +220,13 @@ app.post('/api/login', (req: Request, res: Response) => {
   if (existing) return res.status(409).json({ error: 'that username is already taken' });
 
   const id = randomUUID();
-  const spawn = findSpawnPoint();
-  db.prepare('INSERT INTO players (id, username, x, y, created_at) VALUES (?, ?, ?, ?, ?)')
-    .run(id, clean, spawn.x, spawn.y, Date.now());
+  const spawn = findSpawnPoint('homestead');
+  db.prepare('INSERT INTO players (id, username, biome, x, y, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(id, clean, 'homestead', spawn.x, spawn.y, Date.now());
   for (const [item, qty] of Object.entries(STARTING_INVENTORY)) addItem(id, item, qty);
 
   const player = getPlayerById(id)!;
-  io.emit('playerJoined', { id: player.id, username: player.username, x: player.x, y: player.y });
+  io.emit('playerJoined', { id: player.id, username: player.username, x: player.x, y: player.y, biome: player.biome });
   res.json({ token: player.id, player, inventory: getInventory(id) });
 });
 
@@ -264,12 +276,12 @@ app.post('/api/login/discord', async (req: Request, res: Response) => {
       let candidate = baseName;
       let n = 1;
       while (db.prepare('SELECT 1 FROM players WHERE username = ?').get(candidate)) candidate = `${baseName}${++n}`;
-      const spawn = findSpawnPoint();
-      db.prepare('INSERT INTO players (id, username, discord_id, x, y, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(id, candidate, me.id, spawn.x, spawn.y, Date.now());
+      const spawn = findSpawnPoint('homestead');
+      db.prepare('INSERT INTO players (id, username, discord_id, biome, x, y, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(id, candidate, me.id, 'homestead', spawn.x, spawn.y, Date.now());
       for (const [item, qty] of Object.entries(STARTING_INVENTORY)) addItem(id, item, qty);
       player = getPlayerById(id)!;
-      io.emit('playerJoined', { id: player.id, username: player.username, x: player.x, y: player.y });
+      io.emit('playerJoined', { id: player.id, username: player.username, x: player.x, y: player.y, biome: player.biome });
     }
     res.json({ token: player.id, player, inventory: getInventory(player.id) });
   } catch {
@@ -279,22 +291,33 @@ app.post('/api/login/discord', async (req: Request, res: Response) => {
 
 // ---------- world + state ----------
 
-app.get('/api/world', (_req: Request, res: Response) => {
+app.get('/api/world', (req: Request, res: Response) => {
+  const biomeParam = (req.query.biome as string) || 'homestead';
+  const biome = BIOMES[biomeParam as BiomeId];
+  if (!biome) return res.status(400).json({ error: 'unknown biome' });
+
   const terrain: string[][] = [];
-  for (let y = 0; y < MAP_H; y++) {
+  for (let y = 0; y < biome.mapH; y++) {
     const row: string[] = [];
-    for (let x = 0; x < MAP_W; x++) row.push(terrainAt(x, y));
+    for (let x = 0; x < biome.mapW; x++) row.push(biome.terrainAt(x, y));
     terrain.push(row);
   }
+
   res.json({
-    mapW: MAP_W,
-    mapH: MAP_H,
+    biomeId: biome.id,
+    biomeName: biome.name,
+    mapW: biome.mapW,
+    mapH: biome.mapH,
     terrain,
-    plots: PLOTS,
+    plots: biome.plots,
+    decorations: biome.decorations,
+    paths: biome.paths,
+    doors: biome.doors,
+    homesteadsAllowed: biome.homesteadsAllowed,
+    shopDoor: SHOP_DOOR,
     crops: CROPS,
     buildings: BUILDINGS,
     livestock: LIVESTOCK,
-    shopLocation: SHOP_LOCATION,
     sellPrices: SELL_PRICES,
     craftRecipes: CRAFT_RECIPES,
     homesteadTiers: HOMESTEAD_TIERS,
@@ -304,15 +327,16 @@ app.get('/api/world', (_req: Request, res: Response) => {
 
 app.get('/api/state', authMiddleware, (req: Request, res: Response) => {
   const player = (req as any).player as PlayerRow;
+  const biome = player.biome as BiomeId;
   res.json({
     player,
     inventory: getInventory(player.id),
-    players: allPlayersPublic(),
+    players: allPlayersInBiome(biome),
     plotOwners: allPlotOwners(),
-    buildings: allBuildings(),
-    crops: allCrops(),
-    livestock: allLivestock(),
-    resourceNodes: resourceNodeStates(),
+    buildings: allBuildingsInBiome(biome),
+    crops: allCropsInBiome(biome),
+    livestock: allLivestockInBiome(biome),
+    resourceNodes: resourceNodeStatesForBiome(biome),
     craftJob: currentCraftJob(player.id),
     shopPrices: allCurrentPrices(),
   });
@@ -328,24 +352,49 @@ app.post('/api/move', authMiddleware, (req: Request, res: Response) => {
   const dx = Math.abs(x - player.x);
   const dy = Math.abs(y - player.y);
   if (dx > 1 || dy > 1 || (dx === 0 && dy === 0)) return res.status(400).json({ error: 'can only move one tile at a time' });
-  if (!isWalkable(x, y)) return res.status(400).json({ error: 'not walkable' });
-  const blocked = db.prepare('SELECT type FROM buildings WHERE x = ? AND y = ?').get(x, y) as { type: string } | undefined;
+  if (!isWalkable(player.biome as BiomeId, x, y)) return res.status(400).json({ error: 'not walkable' });
+  const blocked = db.prepare('SELECT type FROM buildings WHERE biome = ? AND x = ? AND y = ?').get(player.biome, x, y) as { type: string } | undefined;
   if (blocked) return res.status(400).json({ error: `blocked by a ${blocked.type}` });
 
   db.prepare('UPDATE players SET x = ?, y = ? WHERE id = ?').run(x, y, player.id);
-  io.emit('playerMoved', { id: player.id, x, y });
+  io.emit('playerMoved', { id: player.id, x, y, biome: player.biome, username: player.username });
   res.json({ x, y });
+});
+
+// ---------- travel between biomes ----------
+
+app.post('/api/travel', authMiddleware, (req: Request, res: Response) => {
+  const player = (req as any).player as PlayerRow;
+  const { direction } = req.body ?? {};
+  if (!['north', 'south', 'east', 'west'].includes(direction)) return res.status(400).json({ error: 'invalid direction' });
+
+  const biome = BIOMES[player.biome as BiomeId];
+  const destId = biome.doors[direction as Direction];
+  if (!destId) return res.status(400).json({ error: 'nothing that way yet' });
+
+  const doorPos = doorPosition(biome, direction as Direction);
+  if (player.x !== doorPos.x || player.y !== doorPos.y) return res.status(400).json({ error: 'stand on the door to travel' });
+
+  const destBiome = BIOMES[destId];
+  const arriveDir = oppositeDirection(direction as Direction);
+  const arrivePos = doorPosition(destBiome, arriveDir);
+
+  db.prepare('UPDATE players SET biome = ?, x = ?, y = ? WHERE id = ?').run(destId, arrivePos.x, arrivePos.y, player.id);
+  io.emit('playerMoved', { id: player.id, x: arrivePos.x, y: arrivePos.y, biome: destId, username: player.username });
+
+  res.json({ biome: destId, x: arrivePos.x, y: arrivePos.y });
 });
 
 // ---------- gathering ----------
 
 app.post('/api/gather', authMiddleware, (req: Request, res: Response) => {
   const player = (req as any).player as PlayerRow;
+  const biome = player.biome as BiomeId;
   const { nodeId } = req.body ?? {};
-  const nodeCfg = RESOURCE_NODES.find((n) => n.id === nodeId);
-  if (!nodeCfg) return res.status(400).json({ error: 'unknown resource node' });
+  const nodeCfg = BIOMES[biome].resourceNodes.find((n) => n.id === nodeId);
+  if (!nodeCfg) return res.status(400).json({ error: 'nothing to gather here' });
 
-  const positions = currentResourcePositions();
+  const positions = currentResourcePositions(biome);
   const pos = positions[nodeId] ?? { x: nodeCfg.x, y: nodeCfg.y };
   if (chebyshev(player.x, player.y, pos.x, pos.y) > 1) return res.status(400).json({ error: 'too far away' });
 
@@ -355,7 +404,7 @@ app.post('/api/gather', authMiddleware, (req: Request, res: Response) => {
   addItem(player.id, nodeCfg.type, nodeCfg.yieldAmount);
 
   const occupied = (x: number, y: number) => Object.values(positions).some((p) => p.x === x && p.y === y);
-  const newSpot = randomFreeResourceSpot(occupied);
+  const newSpot = randomFreeResourceSpot(biome, occupied);
   const depletedUntil = Date.now() + nodeCfg.respawnMs;
   db.prepare('UPDATE resource_state SET x = ?, y = ?, depleted_until = ? WHERE node_id = ?')
     .run(newSpot.x, newSpot.y, depletedUntil, nodeId);
@@ -368,8 +417,10 @@ app.post('/api/gather', authMiddleware, (req: Request, res: Response) => {
 
 app.post('/api/plots/:plotId/claim', authMiddleware, (req: Request, res: Response) => {
   const player = (req as any).player as PlayerRow;
-  const plot = PLOTS.find((p) => p.id === req.params.plotId);
-  if (!plot) return res.status(400).json({ error: 'unknown plot' });
+  const found = findPlotById(req.params.plotId);
+  if (!found) return res.status(400).json({ error: 'unknown plot' });
+  const { plot, biome } = found;
+  if (player.biome !== biome) return res.status(400).json({ error: 'stand on the plot to claim it' });
 
   const already = db.prepare('SELECT 1 FROM plot_owners WHERE plot_id = ?').get(plot.id);
   if (already) return res.status(400).json({ error: 'plot already claimed' });
@@ -393,8 +444,9 @@ app.post('/api/plots/:plotId/claim', authMiddleware, (req: Request, res: Respons
 
 app.post('/api/plots/:plotId/name', authMiddleware, (req: Request, res: Response) => {
   const player = (req as any).player as PlayerRow;
-  const plot = PLOTS.find((p) => p.id === req.params.plotId);
-  if (!plot) return res.status(400).json({ error: 'unknown plot' });
+  const found = findPlotById(req.params.plotId);
+  if (!found) return res.status(400).json({ error: 'unknown plot' });
+  const { plot } = found;
   const { name } = req.body ?? {};
   if (typeof name !== 'string' || name.trim().length < 1) return res.status(400).json({ error: 'name required' });
 
@@ -413,27 +465,28 @@ app.post('/api/plots/:plotId/name', authMiddleware, (req: Request, res: Response
 
 app.post('/api/buildings', authMiddleware, (req: Request, res: Response) => {
   const player = (req as any).player as PlayerRow;
+  const biome = player.biome;
   const { x, y, type } = req.body ?? {};
   const cfg = BUILDINGS[type];
   if (!cfg) return res.status(400).json({ error: 'unknown building type' });
   if (typeof x !== 'number' || typeof y !== 'number') return res.status(400).json({ error: 'x,y required' });
 
-  const plot = plotAt(x, y);
+  const plot = plotAt(biome as BiomeId, x, y);
   if (!plot) return res.status(400).json({ error: 'not inside a homestead plot' });
   const owner = db.prepare('SELECT owner_id FROM plot_owners WHERE plot_id = ?').get(plot.id) as { owner_id: string } | undefined;
   if (!owner || owner.owner_id !== player.id) return res.status(403).json({ error: 'not your plot' });
 
-  if (type !== 'cabin' && !hasBuilding(plot.id, 'cabin')) {
+  if (type !== 'cabin' && !hasBuilding(biome, plot.id, 'cabin')) {
     return res.status(400).json({ error: 'build a Cabin first — nothing else works without one' });
   }
-  if (tileOccupied(x, y)) return res.status(400).json({ error: 'tile already in use' });
+  if (tileOccupied(biome, x, y)) return res.status(400).json({ error: 'tile already in use' });
 
   for (const [item, qty] of Object.entries(cfg.cost)) {
     if ((getInventory(player.id)[item!] ?? 0) < (qty as number)) return res.status(400).json({ error: `not enough ${item}` });
   }
   for (const [item, qty] of Object.entries(cfg.cost)) removeItem(player.id, item!, qty as number);
 
-  db.prepare('INSERT INTO buildings (x, y, plot_id, owner_id, type) VALUES (?, ?, ?, ?, ?)').run(x, y, plot.id, player.id, type);
+  db.prepare('INSERT INTO buildings (biome, x, y, plot_id, owner_id, type) VALUES (?, ?, ?, ?, ?, ?)').run(biome, x, y, plot.id, player.id, type);
   io.emit('buildingUpdate', { x, y, plotId: plot.id, ownerId: player.id, type });
   res.json({ inventory: getInventory(player.id) });
 });
@@ -442,35 +495,37 @@ app.post('/api/buildings', authMiddleware, (req: Request, res: Response) => {
 
 app.post('/api/crops/plant', authMiddleware, (req: Request, res: Response) => {
   const player = (req as any).player as PlayerRow;
+  const biome = player.biome;
   const { x, y, cropType } = req.body ?? {};
   const cfg = CROPS[cropType];
   if (!cfg) return res.status(400).json({ error: 'unknown crop' });
 
-  const plot = plotAt(x, y);
+  const plot = plotAt(biome as BiomeId, x, y);
   if (!plot) return res.status(400).json({ error: 'not inside a homestead plot' });
   const owner = db.prepare('SELECT owner_id FROM plot_owners WHERE plot_id = ?').get(plot.id) as { owner_id: string } | undefined;
   if (!owner || owner.owner_id !== player.id) return res.status(403).json({ error: 'not your plot' });
 
-  if (!hasBuilding(plot.id, 'cabin')) return res.status(400).json({ error: 'build a Cabin first' });
-  if (!hasBuilding(plot.id, 'shed')) return res.status(400).json({ error: 'build a Shed to farm crops' });
-  if (tileOccupied(x, y)) return res.status(400).json({ error: 'tile already in use' });
+  if (!hasBuilding(biome, plot.id, 'cabin')) return res.status(400).json({ error: 'build a Cabin first' });
+  if (!hasBuilding(biome, plot.id, 'shed')) return res.status(400).json({ error: 'build a Shed to farm crops' });
+  if (tileOccupied(biome, x, y)) return res.status(400).json({ error: 'tile already in use' });
 
-  db.prepare('INSERT INTO crops (x, y, owner_id, crop_type, planted_at) VALUES (?, ?, ?, ?, ?)').run(x, y, player.id, cropType, Date.now());
+  db.prepare('INSERT INTO crops (biome, x, y, owner_id, crop_type, planted_at) VALUES (?, ?, ?, ?, ?, ?)').run(biome, x, y, player.id, cropType, Date.now());
   io.emit('cropUpdate', { x, y, ownerId: player.id, cropType, plantedAt: Date.now(), removed: false });
   res.json({ ok: true });
 });
 
 app.post('/api/crops/harvest', authMiddleware, (req: Request, res: Response) => {
   const player = (req as any).player as PlayerRow;
+  const biome = player.biome;
   const { x, y } = req.body ?? {};
-  const crop = db.prepare('SELECT * FROM crops WHERE x = ? AND y = ?').get(x, y) as CropRow | undefined;
+  const crop = db.prepare('SELECT * FROM crops WHERE biome = ? AND x = ? AND y = ?').get(biome, x, y) as CropRow | undefined;
   if (!crop || crop.owner_id !== player.id) return res.status(403).json({ error: 'not your crop' });
 
   const cfg = CROPS[crop.crop_type];
   if (Date.now() - crop.planted_at < cfg.growTimeMs) return res.status(400).json({ error: 'not ready yet' });
 
   addItem(player.id, crop.crop_type, cfg.yieldAmount);
-  db.prepare('DELETE FROM crops WHERE x = ? AND y = ?').run(x, y);
+  db.prepare('DELETE FROM crops WHERE biome = ? AND x = ? AND y = ?').run(biome, x, y);
   io.emit('cropUpdate', { x, y, removed: true });
   res.json({ inventory: getInventory(player.id) });
 });
@@ -479,32 +534,34 @@ app.post('/api/crops/harvest', authMiddleware, (req: Request, res: Response) => 
 
 app.post('/api/livestock/buy', authMiddleware, (req: Request, res: Response) => {
   const player = (req as any).player as PlayerRow;
+  const biome = player.biome;
   const { x, y, type } = req.body ?? {};
   const cfg = LIVESTOCK[type];
   if (!cfg) return res.status(400).json({ error: 'unknown animal' });
 
-  const plot = plotAt(x, y);
+  const plot = plotAt(biome as BiomeId, x, y);
   if (!plot) return res.status(400).json({ error: 'not inside a homestead plot' });
   const owner = db.prepare('SELECT owner_id FROM plot_owners WHERE plot_id = ?').get(plot.id) as { owner_id: string } | undefined;
   if (!owner || owner.owner_id !== player.id) return res.status(403).json({ error: 'not your plot' });
 
-  if (!hasBuilding(plot.id, 'cabin')) return res.status(400).json({ error: 'build a Cabin first' });
-  if (!hasBuilding(plot.id, 'barn')) return res.status(400).json({ error: 'build a Barn to keep livestock' });
-  if (tileOccupied(x, y)) return res.status(400).json({ error: 'tile already in use' });
+  if (!hasBuilding(biome, plot.id, 'cabin')) return res.status(400).json({ error: 'build a Cabin first' });
+  if (!hasBuilding(biome, plot.id, 'barn')) return res.status(400).json({ error: 'build a Barn to keep livestock' });
+  if (tileOccupied(biome, x, y)) return res.status(400).json({ error: 'tile already in use' });
 
   const paid = removeItem(player.id, 'coin', cfg.cost);
   if (!paid) return res.status(400).json({ error: `not enough coins (need ${cfg.cost})` });
 
-  db.prepare('INSERT INTO livestock (x, y, plot_id, owner_id, type, last_collected_at) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(x, y, plot.id, player.id, type, Date.now());
+  db.prepare('INSERT INTO livestock (biome, x, y, plot_id, owner_id, type, last_collected_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(biome, x, y, plot.id, player.id, type, Date.now());
   io.emit('livestockUpdate', { x, y, ownerId: player.id, type, lastCollectedAt: Date.now(), removed: false });
   res.json({ inventory: getInventory(player.id) });
 });
 
 app.post('/api/livestock/collect', authMiddleware, (req: Request, res: Response) => {
   const player = (req as any).player as PlayerRow;
+  const biome = player.biome;
   const { x, y } = req.body ?? {};
-  const animal = db.prepare('SELECT * FROM livestock WHERE x = ? AND y = ?').get(x, y) as LivestockRow | undefined;
+  const animal = db.prepare('SELECT * FROM livestock WHERE biome = ? AND x = ? AND y = ?').get(biome, x, y) as LivestockRow | undefined;
   if (!animal || animal.owner_id !== player.id) return res.status(403).json({ error: 'not your animal' });
 
   const cfg = LIVESTOCK[animal.type];
@@ -512,7 +569,7 @@ app.post('/api/livestock/collect', authMiddleware, (req: Request, res: Response)
 
   addItem(player.id, cfg.produceItem, cfg.produceQty);
   const now = Date.now();
-  db.prepare('UPDATE livestock SET last_collected_at = ? WHERE x = ? AND y = ?').run(now, x, y);
+  db.prepare('UPDATE livestock SET last_collected_at = ? WHERE biome = ? AND x = ? AND y = ?').run(now, biome, x, y);
   io.emit('livestockUpdate', { x, y, ownerId: player.id, type: animal.type, lastCollectedAt: now, removed: false });
   res.json({ inventory: getInventory(player.id) });
 });
@@ -559,13 +616,14 @@ app.post('/api/craft/collect', authMiddleware, (req: Request, res: Response) => 
   res.json({ inventory: getInventory(player.id), craftJob: null });
 });
 
-// ---------- general store ----------
+// ---------- general store (only usable inside the Shop biome) ----------
 
 app.post('/api/shop/sell', authMiddleware, (req: Request, res: Response) => {
   const player = (req as any).player as PlayerRow;
   const { item, qty } = req.body ?? {};
   if (!SELL_PRICES[item] || typeof qty !== 'number' || qty <= 0) return res.status(400).json({ error: 'invalid item or quantity' });
-  if (distToRect(player.x, player.y, SHOP_LOCATION.x, SHOP_LOCATION.y, SHOP_LOCATION.size) > 1) return res.status(400).json({ error: 'not near the store' });
+  if (player.biome !== 'shop') return res.status(400).json({ error: 'the store is in the Shop — travel there first' });
+  if (chebyshev(player.x, player.y, SHOP_DOOR.x, SHOP_DOOR.y) > 1) return res.status(400).json({ error: 'not near the store' });
 
   const price = currentPrice(item);
   const ok = removeItem(player.id, item, qty);
@@ -601,7 +659,7 @@ io.on('connection', (socket: Socket) => {
     if (!playerId) return;
     const me = getPlayerById(playerId);
     const target = getPlayerById(targetId);
-    if (!me || !target || chebyshev(me.x, me.y, target.x, target.y) > 1) return;
+    if (!me || !target || me.biome !== target.biome || chebyshev(me.x, me.y, target.x, target.y) > 1) return;
     sockets.get(targetId)?.emit('tradeInvite', { fromId: playerId, fromUsername: me.username });
   });
 

@@ -2,12 +2,14 @@ export interface PlayerRow {
   id: string;
   username: string;
   discord_id: string | null;
+  biome: string;
   x: number;
   y: number;
   created_at: number;
 }
 
 export interface CropRow {
+  biome: string;
   x: number;
   y: number;
   owner_id: string;
@@ -16,6 +18,7 @@ export interface CropRow {
 }
 
 export interface BuildingRow {
+  biome: string;
   x: number;
   y: number;
   plot_id: string;

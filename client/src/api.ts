@@ -1,9 +1,12 @@
 export const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
+export type Direction = 'north' | 'south' | 'east' | 'west';
+
 export interface Player {
   id: string;
   username: string;
   discord_id: string | null;
+  biome: string;
   x: number;
   y: number;
   created_at: number;
@@ -14,6 +17,7 @@ export interface PublicPlayer {
   username: string;
   x: number;
   y: number;
+  biome: string;
 }
 
 export interface ResourceNodeState {
@@ -32,6 +36,13 @@ export interface PlotConfig {
   x: number;
   y: number;
   size: number;
+}
+
+export interface DecorationConfig {
+  x: number;
+  y: number;
+  icon: string;
+  blocking: boolean;
 }
 
 export interface CropConfig {
@@ -71,14 +82,20 @@ export interface CraftRecipeConfig {
 }
 
 export interface WorldConfig {
+  biomeId: string;
+  biomeName: string;
   mapW: number;
   mapH: number;
   terrain: string[][];
   plots: PlotConfig[];
+  decorations: DecorationConfig[];
+  paths: { x: number; y: number }[];
+  doors: Partial<Record<Direction, string>>;
+  homesteadsAllowed: boolean;
+  shopDoor: { x: number; y: number };
   crops: Record<string, CropConfig>;
   buildings: Record<string, BuildingConfig>;
   livestock: Record<string, LivestockConfig>;
-  shopLocation: { x: number; y: number; size: number };
   sellPrices: Record<string, number>;
   craftRecipes: Record<string, CraftRecipeConfig>;
   homesteadTiers: Record<number, { label: string; cost: number }>;
@@ -156,8 +173,8 @@ export async function loginWithDiscord(discordAccessToken: string) {
   }));
 }
 
-export async function getWorld(): Promise<WorldConfig> {
-  return handle(await fetch(`${API_BASE}/api/world`));
+export async function getWorld(biome: string): Promise<WorldConfig> {
+  return handle(await fetch(`${API_BASE}/api/world?biome=${encodeURIComponent(biome)}`));
 }
 
 export async function getState(token: string): Promise<GameState> {
@@ -173,6 +190,7 @@ async function post(token: string, path: string, body?: unknown) {
 }
 
 export const move = (token: string, x: number, y: number) => post(token, '/api/move', { x, y });
+export const travel = (token: string, direction: Direction) => post(token, '/api/travel', { direction });
 export const gather = (token: string, nodeId: string) => post(token, '/api/gather', { nodeId });
 export const claimPlot = (token: string, plotId: string) => post(token, `/api/plots/${plotId}/claim`);
 export const nameFarm = (token: string, plotId: string, name: string) => post(token, `/api/plots/${plotId}/name`, { name });
