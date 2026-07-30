@@ -87,6 +87,7 @@ export default function App() {
   const mapWrapperRef = useRef<HTMLDivElement>(null);
   const [cellPx, setCellPx] = useState(DEFAULT_CELL_PX);
   const [claimConfirmPlot, setClaimConfirmPlot] = useState<PlotConfig | null>(null);
+  const [pendingGatherId, setPendingGatherId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!inDiscord || token) return;
@@ -273,18 +274,38 @@ export default function App() {
       else if (e.key === 'ArrowRight' || e.key === 'd') dx = 1;
       else return;
       e.preventDefault();
-      const nx = state!.player.x + dx;
-      const ny = state!.player.y + dy;
-      move(token!, nx, ny).catch((err) => showError(err.message));
+
+      let prevX = 0, prevY = 0, nx = 0, ny = 0, myId = '';
+      setState((prev) => {
+        if (!prev) return prev;
+        prevX = prev.player.x; prevY = prev.player.y; myId = prev.player.id;
+        nx = prevX + dx; ny = prevY + dy;
+        const players = prev.players.map((p) => (p.id === myId ? { ...p, x: nx, y: ny } : p));
+        return { ...prev, player: { ...prev.player, x: nx, y: ny }, players };
+      });
+
+      move(token!, nx, ny).catch((err) => {
+        showError(err.message);
+        // Revert, but only if nothing newer has already moved us elsewhere.
+        setState((prev) => {
+          if (!prev || prev.player.x !== nx || prev.player.y !== ny) return prev;
+          const players = prev.players.map((p) => (p.id === myId ? { ...p, x: prevX, y: prevY } : p));
+          return { ...prev, player: { ...prev.player, x: prevX, y: prevY }, players };
+        });
+      });
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [token, state, world]);
 
   const handleGather = useCallback((nodeId: string) => {
-    if (!token) return;
-    gather(token, nodeId).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => showError(e.message));
-  }, [token]);
+    if (!token || pendingGatherId) return;
+    setPendingGatherId(nodeId);
+    gather(token, nodeId)
+      .then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p)))
+      .catch((e) => showError(e.message))
+      .finally(() => setPendingGatherId(null));
+  }, [token, pendingGatherId]);
 
   const handleClaim = useCallback((plotId: string) => {
     if (!token) return;
@@ -681,7 +702,7 @@ export default function App() {
               {nearbyNodes.map((n) => {
                 const available = n.depletedUntil <= Date.now();
                 return (
-                  <button key={n.id} className="crop-option" disabled={!available} onClick={() => handleGather(n.id)}>
+                  <button key={n.id} className="crop-option" disabled={!available || !!pendingGatherId} onClick={() => handleGather(n.id)}>
                     {n.icon} Gather {n.type} {!available && `(back in ${Math.max(0, Math.ceil((n.depletedUntil - Date.now()) / 1000))}s)`}
                   </button>
                 );
