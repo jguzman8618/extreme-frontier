@@ -62,6 +62,17 @@ function doorPositionClient(world: WorldConfig, dir: Direction): { x: number; y:
 
 const DIRECTION_LABEL: Record<Direction, string> = { north: 'North', south: 'South', east: 'East', west: 'West' };
 
+function isKnownBlocked(world: WorldConfig, state: GameState, x: number, y: number): boolean {
+  if (x < 0 || y < 0 || x >= world.mapW || y >= world.mapH) return true;
+  const terrain = world.terrain[y]?.[x];
+  if (terrain === 'water') return true;
+  if (world.building && x >= world.building.x && x < world.building.x + world.building.w &&
+      y >= world.building.y && y < world.building.y + world.building.h) return true;
+  if (world.decorations.some((d) => d.blocking && d.x === x && d.y === y)) return true;
+  if (state.buildings.some((b) => b.x === x && b.y === y)) return true;
+  return false;
+}
+
 const MIN_CELL_PX = 6;
 const DEFAULT_CELL_PX = 13;
 
@@ -286,6 +297,7 @@ export default function App() {
       const prevY = playerPosRef.current.y;
       const nx = prevX + dx;
       const ny = prevY + dy;
+      if (isKnownBlocked(world!, state!, nx, ny)) return;
       playerPosRef.current = { x: nx, y: ny };
 
       setState((prev) => {

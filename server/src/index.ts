@@ -344,7 +344,7 @@ app.get('/api/world', (req: Request, res: Response) => {
     homesteadsAllowed: biome.homesteadsAllowed,
     building: biome.building ?? null,
     shopDoor: SHOP_DOOR,
-    crops: CROPS,
+    crops: Object.fromEntries(Object.entries(CROPS).filter(([id]) => biome.allowedCrops.includes(id))),
     buildings: BUILDINGS,
     livestock: LIVESTOCK,
     sellPrices: SELL_PRICES,
@@ -529,6 +529,9 @@ app.post('/api/crops/plant', authMiddleware, (req: Request, res: Response) => {
   const { x, y, cropType } = req.body ?? {};
   const cfg = CROPS[cropType];
   if (!cfg) return res.status(400).json({ error: 'unknown crop' });
+  if (!BIOMES[biome as BiomeId].allowedCrops.includes(cropType)) {
+    return res.status(400).json({ error: `${cfg.name} doesn't grow here` });
+  }
 
   const plot = plotAt(biome as BiomeId, x, y);
   if (!plot) return res.status(400).json({ error: 'not inside a homestead plot' });

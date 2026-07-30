@@ -55,6 +55,7 @@ export interface BiomeConfig {
   doors: Partial<Record<Direction, BiomeId>>;
   homesteadsAllowed: boolean;
   building?: BuildingFootprint;
+  allowedCrops: string[];
 }
 
 const OPPOSITE: Record<Direction, Direction> = { north: 'south', south: 'north', east: 'west', west: 'east' };
@@ -153,6 +154,7 @@ export const HOMESTEAD_BIOME: BiomeConfig = {
   paths: [],
   doors: { east: 'shop', west: 'fall' },
   homesteadsAllowed: true,
+  allowedCrops: ['wheat', 'corn', 'potato'],
 };
 
 // ==================== SHOP BIOME ====================
@@ -277,6 +279,7 @@ export const SHOP_BIOME: BiomeConfig = {
   paths: buildShopPaths(),
   doors: { west: 'homestead' },
   homesteadsAllowed: false,
+  allowedCrops: [],
   building: { ...SHOP_BUILDING, icon: '🏪' },
 };
 
@@ -343,6 +346,7 @@ export const FALL_BIOME: BiomeConfig = {
   paths: [],
   doors: { east: 'homestead' },
   homesteadsAllowed: true,
+  allowedCrops: ['pumpkin', 'squash', 'cranberry'],
 };
 
 export const BIOMES: Record<BiomeId, BiomeConfig> = {
