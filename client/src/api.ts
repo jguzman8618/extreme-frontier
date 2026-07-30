@@ -109,6 +109,7 @@ export interface WorldConfig {
   sellPrices: Record<string, number>;
   craftRecipes: Record<string, CraftRecipeConfig>;
   homesteadTiers: Record<number, { label: string; cost: number }>;
+  materialIcons: Record<string, string>;
   maxHomesteads: number;
 }
 

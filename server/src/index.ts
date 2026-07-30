@@ -13,7 +13,7 @@ import {
   plotAt, plotCenter, isWalkable, randomFreeResourceSpot,
   CROPS, BUILDINGS, LIVESTOCK, STARTING_INVENTORY,
   SELL_PRICES, CRAFT_RECIPES, DEMAND_STEP, DEMAND_RECOVERY_MS,
-  HOMESTEAD_TIERS, MAX_HOMESTEADS_PER_PLAYER, SHOP_DOOR,
+  HOMESTEAD_TIERS, MAX_HOMESTEADS_PER_PLAYER, SHOP_DOOR, MATERIAL_ICONS,
   PlotConfig,
 } from './world';
 import { PlayerRow, CropRow, BuildingRow } from './types';
@@ -351,6 +351,7 @@ app.get('/api/world', (req: Request, res: Response) => {
     craftRecipes: CRAFT_RECIPES,
     homesteadTiers: HOMESTEAD_TIERS,
     maxHomesteads: MAX_HOMESTEADS_PER_PLAYER,
+    materialIcons: MATERIAL_ICONS,
   });
 });
 

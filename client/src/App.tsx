@@ -18,6 +18,7 @@ function itemIconFor(item: string, world: WorldConfig | null): string {
   if (ITEM_ICON[item]) return ITEM_ICON[item];
   if (world?.crops[item]) return world.crops[item].icon;
   if (world?.craftRecipes[item]) return world.craftRecipes[item].icon;
+  if (world?.materialIcons[item]) return world.materialIcons[item];
   return '📦';
 }
 

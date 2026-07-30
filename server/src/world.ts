@@ -300,6 +300,8 @@ export const FALL_PLOTS: PlotConfig[] = [
   { id: 'fall_plot7', x: 22, y: 8, size: 3 }, { id: 'fall_plot8', x: 29, y: 8, size: 7 },
   { id: 'fall_plot9', x: 2, y: 17, size: 3 }, { id: 'fall_plot10', x: 9, y: 17, size: 7 },
   { id: 'fall_plot11', x: 22, y: 17, size: 5 }, { id: 'fall_plot12', x: 29, y: 17, size: 3 },
+  { id: 'fall_plot13', x: 2, y: 26, size: 5 }, { id: 'fall_plot14', x: 9, y: 26, size: 3 },
+  { id: 'fall_plot15', x: 22, y: 26, size: 3 }, { id: 'fall_plot16', x: 29, y: 26, size: 5 },
 ];
 
 export const FALL_RESOURCE_NODES: ResourceNodeConfig[] = [
@@ -313,8 +315,8 @@ export const FALL_RESOURCE_NODES: ResourceNodeConfig[] = [
   { id: 'fall_hardwood8', x: 10, y: 12, type: 'hardwood', icon: '🌳', respawnMs: 45_000, yieldAmount: 2 },
   { id: 'fall_hardwood9', x: 3, y: 20, type: 'hardwood', icon: '🌳', respawnMs: 45_000, yieldAmount: 2 },
   { id: 'fall_hardwood10', x: 8, y: 18, type: 'hardwood', icon: '🌳', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'fall_hardwood11', x: 3, y: 28, type: 'hardwood', icon: '🌳', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'fall_hardwood12', x: 10, y: 28, type: 'hardwood', icon: '🌳', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'fall_hardwood11', x: 3, y: 35, type: 'hardwood', icon: '🌳', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'fall_hardwood12', x: 10, y: 35, type: 'hardwood', icon: '🌳', respawnMs: 45_000, yieldAmount: 2 },
   { id: 'fall_flint1', x: 16, y: 12, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
   { id: 'fall_flint2', x: 23, y: 12, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
   { id: 'fall_flint3', x: 28, y: 10, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
@@ -324,8 +326,8 @@ export const FALL_RESOURCE_NODES: ResourceNodeConfig[] = [
   { id: 'fall_flint7', x: 30, y: 20, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
   { id: 'fall_flint8', x: 36, y: 20, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
   { id: 'fall_flint9', x: 16, y: 28, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'fall_flint10', x: 23, y: 28, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'fall_flint11', x: 30, y: 28, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'fall_flint10', x: 23, y: 35, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'fall_flint11', x: 30, y: 35, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
   { id: 'fall_flint12', x: 36, y: 28, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
 ];
 
@@ -348,6 +350,11 @@ export const BIOMES: Record<BiomeId, BiomeConfig> = {
   shop: SHOP_BIOME,
   fall: FALL_BIOME,
 };
+
+export const MATERIAL_ICONS: Record<string, string> = {};
+for (const biome of Object.values(BIOMES)) {
+  for (const n of biome.resourceNodes) MATERIAL_ICONS[n.type] = n.icon;
+}
 
 export function isInsideBuilding(x: number, y: number, b: { x: number; y: number; w: number; h: number }): boolean {
   return x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h;
