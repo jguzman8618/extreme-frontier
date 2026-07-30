@@ -95,7 +95,7 @@ export default function App() {
   const [tradeSession, setTradeSession] = useState<TradeSessionState | null>(null);
   const [tradeMessage, setTradeMessage] = useState<string | null>(null);
   const [pendingInviteTo, setPendingInviteTo] = useState<string | null>(null);
-  const [craftCategory, setCraftCategory] = useState<'food' | 'feast' | 'tools' | 'goods' | 'toolbox'>('food');
+  const [craftCategory, setCraftCategory] = useState<'food' | 'tools' | 'goods' | 'weapons'>('food');
   const mapWrapperRef = useRef<HTMLDivElement>(null);
   const [cellPx, setCellPx] = useState(DEFAULT_CELL_PX);
   const [claimConfirmPlot, setClaimConfirmPlot] = useState<PlotConfig | null>(null);
@@ -758,13 +758,13 @@ export default function App() {
                 );
               })()}
               <div className="craft-tabs">
-                {(['food', 'feast', 'tools', 'goods', 'toolbox'] as const).map((cat) => (
+                {(['food', 'tools', 'goods', 'weapons'] as const).map((cat) => (
                   <button
                     key={cat}
                     className={`craft-tab ${craftCategory === cat ? 'craft-tab-active' : ''}`}
                     onClick={() => setCraftCategory(cat)}
                   >
-                    {{ food: '🍞', feast: '🍲', tools: '🛠️', goods: '🪑', toolbox: '🧰' }[cat]} {cat[0].toUpperCase() + cat.slice(1)}
+                    {{ food: '🍞', tools: '🛠️', goods: '🪑', weapons: '⚔️' }[cat]} {cat[0].toUpperCase() + cat.slice(1)}
                   </button>
                 ))}
               </div>
@@ -780,7 +780,7 @@ export default function App() {
                   .sort((a, b) => (a.affordable === b.affordable ? 0 : a.affordable ? -1 : 1))
                   .map(({ r, affordable }) => (
                     <button key={r.id} className="crop-option" disabled={!affordable || !!state.craftJob} onClick={() => handleCraft(r.id)}>
-                      {r.icon} {r.name}
+                      {r.icon} {r.name}{r.damage != null && ` — ⚔️${r.damage}`}
                       <span className="option-sub">
                         {Object.entries(r.inputs).map(([i, q]) => `${q} ${i}`).join(', ')} → {r.outputQty}x, {Math.round(r.craftTimeMs / 1000)}s
                         {state.shopPrices[r.id] && ` · sells ${state.shopPrices[r.id]}`}

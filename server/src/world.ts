@@ -532,7 +532,8 @@ export interface CraftRecipeConfig {
   id: string;
   name: string;
   icon: string;
-  category: 'food' | 'feast' | 'tools' | 'goods' | 'toolbox';
+  category: 'food' | 'tools' | 'goods' | 'weapons';
+  damage?: number;
   inputs: Record<string, number>;
   outputQty: number;
   craftTimeMs: number;
@@ -548,24 +549,28 @@ export const CRAFT_RECIPES: Record<string, CraftRecipeConfig> = {
   cornbread: { id: 'cornbread', name: 'Cornbread', icon: '🌽', category: 'food', inputs: { corn: 3 }, outputQty: 2, craftTimeMs: 30_000 },
   fries: { id: 'fries', name: 'Fries', icon: '🍟', category: 'food', inputs: { potato: 3 }, outputQty: 2, craftTimeMs: 30_000 },
   wagonWheel: { id: 'wagonWheel', name: 'Wagon Wheel', icon: '🛞', category: 'goods', inputs: { wood: 4, stone: 3 }, outputQty: 1, craftTimeMs: 60_000 },
-  toolbox: { id: 'toolbox', name: 'Toolbox', icon: '🧰', category: 'toolbox', inputs: { tools: 2, furniture: 1 }, outputQty: 1, craftTimeMs: 90_000 },
-  feast: { id: 'feast', name: 'Feast', icon: '🍲', category: 'feast', inputs: { bread: 2, cheese: 1, omelette: 1 }, outputQty: 1, craftTimeMs: 75_000 },
+  toolbox: { id: 'toolbox', name: 'Toolbox', icon: '🧰', category: 'tools', inputs: { tools: 2, furniture: 1 }, outputQty: 1, craftTimeMs: 90_000 },
+  feast: { id: 'feast', name: 'Feast', icon: '🍲', category: 'food', inputs: { bread: 2, cheese: 1, omelette: 1 }, outputQty: 1, craftTimeMs: 75_000 },
   hardwoodTools: { id: 'hardwoodTools', name: 'Hardwood Tools', icon: '🔨', category: 'tools', inputs: { hardwood: 3, flint: 2 }, outputQty: 1, craftTimeMs: 45_000 },
   pumpkinPie: { id: 'pumpkinPie', name: 'Pumpkin Pie', icon: '🥧', category: 'food', inputs: { pumpkin: 2 }, outputQty: 1, craftTimeMs: 20_000 },
   cranberrySauce: { id: 'cranberrySauce', name: 'Cranberry Sauce', icon: '🍯', category: 'food', inputs: { cranberry: 3 }, outputQty: 2, craftTimeMs: 20_000 },
   roastedSquash: { id: 'roastedSquash', name: 'Roasted Squash', icon: '🍠', category: 'food', inputs: { squash: 2 }, outputQty: 1, craftTimeMs: 20_000 },
-  harvestFeast: { id: 'harvestFeast', name: 'Harvest Feast', icon: '🦃', category: 'feast', inputs: { pumpkinPie: 1, cranberrySauce: 1, roastedSquash: 1 }, outputQty: 1, craftTimeMs: 75_000 },
+  harvestFeast: { id: 'harvestFeast', name: 'Harvest Feast', icon: '🦃', category: 'food', inputs: { pumpkinPie: 1, cranberrySauce: 1, roastedSquash: 1 }, outputQty: 1, craftTimeMs: 75_000 },
   hardwoodFurniture: { id: 'hardwoodFurniture', name: 'Hardwood Furniture', icon: '🪵', category: 'goods', inputs: { hardwood: 6 }, outputQty: 1, craftTimeMs: 45_000 },
   flintBlade: { id: 'flintBlade', name: 'Flint Blade', icon: '🔪', category: 'goods', inputs: { flint: 4 }, outputQty: 1, craftTimeMs: 45_000 },
-  hardwoodToolbox: { id: 'hardwoodToolbox', name: 'Hardwood Toolbox', icon: '🧰', category: 'toolbox', inputs: { hardwoodTools: 2, hardwoodFurniture: 1 }, outputQty: 1, craftTimeMs: 90_000 },
+  hardwoodToolbox: { id: 'hardwoodToolbox', name: 'Hardwood Toolbox', icon: '🧰', category: 'tools', inputs: { hardwoodTools: 2, hardwoodFurniture: 1 }, outputQty: 1, craftTimeMs: 90_000 },
   pineTools: { id: 'pineTools', name: 'Pine Tools', icon: '🛠️', category: 'tools', inputs: { pine: 3, ice: 2 }, outputQty: 1, craftTimeMs: 45_000 },
   pineFurniture: { id: 'pineFurniture', name: 'Pine Furniture', icon: '🪑', category: 'goods', inputs: { pine: 6 }, outputQty: 1, craftTimeMs: 45_000 },
   iceCarving: { id: 'iceCarving', name: 'Ice Carving', icon: '🗿', category: 'goods', inputs: { ice: 4 }, outputQty: 1, craftTimeMs: 45_000 },
-  pineToolbox: { id: 'pineToolbox', name: 'Pine Toolbox', icon: '🧰', category: 'toolbox', inputs: { pineTools: 2, pineFurniture: 1 }, outputQty: 1, craftTimeMs: 90_000 },
+  pineToolbox: { id: 'pineToolbox', name: 'Pine Toolbox', icon: '🧰', category: 'tools', inputs: { pineTools: 2, pineFurniture: 1 }, outputQty: 1, craftTimeMs: 90_000 },
   carrotSoup: { id: 'carrotSoup', name: 'Carrot Soup', icon: '🍲', category: 'food', inputs: { carrot: 3 }, outputQty: 2, craftTimeMs: 20_000 },
   cabbageRolls: { id: 'cabbageRolls', name: 'Cabbage Rolls', icon: '🥙', category: 'food', inputs: { cabbage: 2 }, outputQty: 1, craftTimeMs: 20_000 },
   turnipMash: { id: 'turnipMash', name: 'Turnip Mash', icon: '🍚', category: 'food', inputs: { turnip: 2 }, outputQty: 1, craftTimeMs: 20_000 },
-  wintersFeast: { id: 'wintersFeast', name: "Winter's Feast", icon: '❄️', category: 'feast', inputs: { carrotSoup: 1, cabbageRolls: 1, turnipMash: 1 }, outputQty: 1, craftTimeMs: 75_000 },
+  wintersFeast: { id: 'wintersFeast', name: "Winter's Feast", icon: '❄️', category: 'food', inputs: { carrotSoup: 1, cabbageRolls: 1, turnipMash: 1 }, outputQty: 1, craftTimeMs: 75_000 },
+  woodenClub: { id: 'woodenClub', name: 'Wooden Club', icon: '🏏', category: 'weapons', inputs: { wood: 5 }, outputQty: 1, craftTimeMs: 30_000, damage: 10 },
+  stoneHatchet: { id: 'stoneHatchet', name: 'Stone Hatchet', icon: '🪓', category: 'weapons', inputs: { wood: 3, stone: 4 }, outputQty: 1, craftTimeMs: 45_000, damage: 20 },
+  huntingBow: { id: 'huntingBow', name: 'Hunting Bow', icon: '🏹', category: 'weapons', inputs: { hardwood: 4, flint: 3 }, outputQty: 1, craftTimeMs: 60_000, damage: 30 },
+  iceSpear: { id: 'iceSpear', name: 'Ice Spear', icon: '🔱', category: 'weapons', inputs: { pine: 4, ice: 3 }, outputQty: 1, craftTimeMs: 60_000, damage: 35 },
 };
 
 // ---------- General Store (only usable while in the Shop biome) ----------
@@ -607,6 +612,10 @@ export const SELL_PRICES: Record<string, number> = {
   cabbageRolls: 1,
   turnipMash: 1,
   wintersFeast: 12,
+  woodenClub: 2,
+  stoneHatchet: 4,
+  huntingBow: 6,
+  iceSpear: 7,
 };
 
 export const DEMAND_STEP = 3;
