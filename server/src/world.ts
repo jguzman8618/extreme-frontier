@@ -168,29 +168,50 @@ const SHOP_BUILDING = { x: 16, y: 11, w: 7, h: 7 };
 export const SHOP_DOOR = { x: 19, y: 18 }; // just south of the building
 
 function buildShopPond(): { x: number; y: number }[] {
+  // Irregular, asymmetric outline — varying width AND offset per row,
+  // not a formula-perfect circle.
+  const rows: number[][] = [
+    [30, 31],
+    [28, 29, 30, 31, 32],
+    [27, 28, 29, 30, 31, 32, 33],
+    [28, 29, 30, 31, 32, 33, 34],
+    [28, 29, 30, 31, 32, 33],
+    [29, 30, 31, 32],
+    [30, 31],
+  ];
   const tiles: { x: number; y: number }[] = [];
-  const cx = 31, cy = 7, r = 3;
-  for (let x = cx - r; x <= cx + r; x++) {
-    for (let y = cy - r; y <= cy + r; y++) {
-      const dx = x - cx, dy = y - cy;
-      if (dx * dx + dy * dy <= r * r + 0.5) tiles.push({ x, y });
-    }
-  }
+  rows.forEach((cols, i) => {
+    const y = 4 + i;
+    cols.forEach((x) => tiles.push({ x, y }));
+  });
   return tiles;
 }
 
 function buildShopStream(): { x: number; y: number }[] {
-  // Exits the pond's south-east edge and curves distinctly right away,
-  // rather than continuing straight down from the pond's center.
-  const tiles: { x: number; y: number }[] = [];
-  let x = 34, y = 9;
-  const moves: [number, number][] = [
-    [1, 1], [1, 1], [0, 1], [-1, 1], [-1, 1], [0, 1],
-    [1, 1], [1, 1], [0, 1], [-1, 1], [-1, 1], [0, 1], [1, 1], [0, 1],
+  // Manhattan path (pure horizontal/vertical runs, no diagonal steps) so
+  // every consecutive tile shares a full edge and renders as one
+  // continuous winding body instead of disconnected segments.
+  const waypoints: [number, number][] = [
+    [30, 10], [30, 13], [33, 13], [33, 17], [30, 17], [30, 21], [33, 21], [33, 23],
   ];
-  for (const [dx, dy] of moves) {
-    x += dx; y += dy;
-    tiles.push({ x, y });
+  const seen = new Set<string>();
+  const tiles: { x: number; y: number }[] = [];
+  for (let i = 0; i < waypoints.length - 1; i++) {
+    const [x1, y1] = waypoints[i];
+    const [x2, y2] = waypoints[i + 1];
+    if (x1 === x2) {
+      const [a, b] = y1 < y2 ? [y1, y2] : [y2, y1];
+      for (let y = a; y <= b; y++) {
+        const key = `${x1},${y}`;
+        if (!seen.has(key)) { seen.add(key); tiles.push({ x: x1, y }); }
+      }
+    } else {
+      const [a, b] = x1 < x2 ? [x1, x2] : [x2, x1];
+      for (let x = a; x <= b; x++) {
+        const key = `${x},${y1}`;
+        if (!seen.has(key)) { seen.add(key); tiles.push({ x, y: y1 }); }
+      }
+    }
   }
   return tiles;
 }
@@ -215,8 +236,11 @@ function buildShopDecorations(): DecorationConfig[] {
 
 function buildShopPaths(): { x: number; y: number }[] {
   const paths: { x: number; y: number }[] = [];
-  // Straight walkway from the west arrival door to the building's front door.
-  for (let x = 0; x <= SHOP_DOOR.x; x++) paths.push({ x, y: SHOP_DOOR.y });
+  const arriveY = Math.floor(SHOP_MAP_H / 2); // matches doorPosition('west') exactly
+  // Horizontal from the arrival door, then a bend up to the shop's front door.
+  for (let x = 0; x <= SHOP_DOOR.x; x++) paths.push({ x, y: arriveY });
+  const [yStart, yEnd] = SHOP_DOOR.y < arriveY ? [SHOP_DOOR.y, arriveY] : [arriveY, SHOP_DOOR.y];
+  for (let y = yStart; y <= yEnd; y++) paths.push({ x: SHOP_DOOR.x, y });
   return paths;
 }
 
