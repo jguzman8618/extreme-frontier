@@ -480,6 +480,9 @@ export const CRAFT_RECIPES: Record<string, CraftRecipeConfig> = {
   cranberrySauce: { id: 'cranberrySauce', name: 'Cranberry Sauce', icon: '🍯', category: 'food', inputs: { cranberry: 3 }, outputQty: 2, craftTimeMs: 20_000 },
   roastedSquash: { id: 'roastedSquash', name: 'Roasted Squash', icon: '🍠', category: 'food', inputs: { squash: 2 }, outputQty: 1, craftTimeMs: 20_000 },
   harvestFeast: { id: 'harvestFeast', name: 'Harvest Feast', icon: '🦃', category: 'food', inputs: { pumpkinPie: 1, cranberrySauce: 1, roastedSquash: 1 }, outputQty: 1, craftTimeMs: 75_000 },
+  hardwoodFurniture: { id: 'hardwoodFurniture', name: 'Hardwood Furniture', icon: '🪵', category: 'goods', inputs: { hardwood: 6 }, outputQty: 1, craftTimeMs: 45_000 },
+  flintBlade: { id: 'flintBlade', name: 'Flint Blade', icon: '🔪', category: 'goods', inputs: { flint: 4 }, outputQty: 1, craftTimeMs: 45_000 },
+  hardwoodToolbox: { id: 'hardwoodToolbox', name: 'Hardwood Toolbox', icon: '🧰', category: 'goods', inputs: { hardwoodTools: 2, hardwoodFurniture: 1 }, outputQty: 1, craftTimeMs: 90_000 },
 };
 
 // ---------- General Store (only usable while in the Shop biome) ----------
@@ -507,6 +510,9 @@ export const SELL_PRICES: Record<string, number> = {
   cranberrySauce: 1,
   roastedSquash: 1,
   harvestFeast: 12,
+  hardwoodFurniture: 2,
+  flintBlade: 2,
+  hardwoodToolbox: 8,
 };
 
 export const DEMAND_STEP = 3;
