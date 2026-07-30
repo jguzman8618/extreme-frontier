@@ -79,7 +79,7 @@ const HOME_MAP_H = 40;
 const HOME_BRIDGES = [6, 24];
 
 function homeRiverCenterX(y: number): number {
-  return 18 + Math.round(1.5 * Math.sin((y / HOME_MAP_H) * Math.PI * 2));
+  return 18 + Math.round(2 * Math.sin((y / HOME_MAP_H) * Math.PI * 2));
 }
 
 function homesteadTerrainAt(x: number, y: number): Terrain {

@@ -41,6 +41,13 @@ function isLivestockReady(animal: { type: string; lastCollectedAt: number }, wor
   return Date.now() - animal.lastCollectedAt >= cfg.produceTimeMs;
 }
 
+function isWaterAt(world: WorldConfig, x: number, y: number): boolean {
+  if (y < 0 || y >= world.terrain.length) return false;
+  const row = world.terrain[y];
+  if (x < 0 || x >= row.length) return false;
+  return row[x] === 'water';
+}
+
 // Doors always sit at the midpoint of whichever edge they're on — must
 // match the server's doorPosition() logic exactly.
 function doorPositionClient(world: WorldConfig, dir: Direction): { x: number; y: number } {
@@ -458,6 +465,19 @@ export default function App() {
                   y >= world.building.y && y < world.building.y + world.building.h;
                 const playersHere = state.players.filter((p) => p.x === x && p.y === y);
 
+                let waterStyle: React.CSSProperties | undefined;
+                if (terrain === 'water') {
+                  const n = isWaterAt(world, x, y - 1);
+                  const s = isWaterAt(world, x, y + 1);
+                  const w = isWaterAt(world, x - 1, y);
+                  const e = isWaterAt(world, x + 1, y);
+                  const tl = !n && !w ? '45%' : '0';
+                  const tr = !n && !e ? '45%' : '0';
+                  const br = !s && !e ? '45%' : '0';
+                  const bl = !s && !w ? '45%' : '0';
+                  waterStyle = { borderRadius: `${tl} ${tr} ${br} ${bl}` };
+                }
+
                 const cls = [
                   'cell',
                   terrain === 'water' && 'cell-water',
@@ -483,7 +503,7 @@ export default function App() {
                 }
 
                 return (
-                  <div key={`${x},${y}`} className={cls} title={`${x},${y}`}>
+                  <div key={`${x},${y}`} className={cls} style={waterStyle} title={`${x},${y}`}>
                     {content && <span className="cell-icon">{content}</span>}
                     {playersHere.map((p) => (
                       <span key={p.id} className={`avatar ${p.id === me.id ? 'avatar-me' : ''}`} title={p.username}>
