@@ -6,7 +6,7 @@
 // meaningful within a single biome; the same (x,y) exists independently
 // in every biome.
 
-export type BiomeId = 'homestead' | 'shop' | 'fall' | 'snow';
+export type BiomeId = 'homestead' | 'shop' | 'fall' | 'snow' | 'desert';
 export type Direction = 'north' | 'south' | 'east' | 'west';
 export type Terrain = 'grass' | 'water';
 
@@ -153,7 +153,7 @@ export const HOMESTEAD_BIOME: BiomeConfig = {
   resourceNodes: HOMESTEAD_RESOURCE_NODES,
   decorations: [],
   paths: [],
-  doors: { east: 'shop', west: 'fall', north: 'snow' },
+  doors: { east: 'shop', west: 'fall', north: 'snow', south: 'desert' },
   homesteadsAllowed: true,
   allowedCrops: ['wheat', 'corn', 'potato'],
 };
@@ -415,11 +415,77 @@ export const SNOW_BIOME: BiomeConfig = {
   allowedCrops: ['carrot', 'cabbage', 'turnip'],
 };
 
+
+// ==================== DESERT BIOME ====================
+// A fourth homesteadable biome, reached from the Homestead's south door.
+// Its own resources (Cactus, Sandstone) and crops (Melon, Pepper, Onion).
+
+const DESERT_MAP_W = 40;
+const DESERT_MAP_H = 40;
+
+function desertTerrainAt(_x: number, _y: number): Terrain {
+  return 'grass';
+}
+
+export const DESERT_PLOTS: PlotConfig[] = [
+  { id: 'desert_plot1', x: 2, y: 1, size: 3 }, { id: 'desert_plot2', x: 9, y: 1, size: 5 },
+  { id: 'desert_plot3', x: 22, y: 1, size: 5 }, { id: 'desert_plot4', x: 29, y: 1, size: 3 },
+  { id: 'desert_plot5', x: 2, y: 8, size: 5 }, { id: 'desert_plot6', x: 9, y: 8, size: 3 },
+  { id: 'desert_plot7', x: 22, y: 8, size: 3 }, { id: 'desert_plot8', x: 29, y: 8, size: 7 },
+  { id: 'desert_plot9', x: 2, y: 17, size: 3 }, { id: 'desert_plot10', x: 9, y: 17, size: 7 },
+  { id: 'desert_plot11', x: 22, y: 17, size: 5 }, { id: 'desert_plot12', x: 29, y: 17, size: 3 },
+  { id: 'desert_plot13', x: 2, y: 26, size: 5 }, { id: 'desert_plot14', x: 9, y: 26, size: 3 },
+  { id: 'desert_plot15', x: 22, y: 26, size: 3 }, { id: 'desert_plot16', x: 29, y: 26, size: 5 },
+];
+
+export const DESERT_RESOURCE_NODES: ResourceNodeConfig[] = [
+  { id: 'desert_cactus1', x: 3, y: 4, type: 'cactus', icon: '🌵', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'desert_cactus2', x: 8, y: 2, type: 'cactus', icon: '🌵', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'desert_cactus3', x: 16, y: 4, type: 'cactus', icon: '🌵', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'desert_cactus4', x: 21, y: 2, type: 'cactus', icon: '🌵', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'desert_cactus5', x: 30, y: 4, type: 'cactus', icon: '🌵', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'desert_cactus6', x: 36, y: 4, type: 'cactus', icon: '🌵', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'desert_cactus7', x: 2, y: 13, type: 'cactus', icon: '🌵', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'desert_cactus8', x: 10, y: 12, type: 'cactus', icon: '🌵', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'desert_cactus9', x: 3, y: 20, type: 'cactus', icon: '🌵', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'desert_cactus10', x: 8, y: 18, type: 'cactus', icon: '🌵', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'desert_cactus11', x: 1, y: 26, type: 'cactus', icon: '🌵', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'desert_cactus12', x: 9, y: 29, type: 'cactus', icon: '🌵', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'desert_sandstone1', x: 16, y: 12, type: 'sandstone', icon: '🧱', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'desert_sandstone2', x: 23, y: 12, type: 'sandstone', icon: '🧱', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'desert_sandstone3', x: 28, y: 10, type: 'sandstone', icon: '🧱', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'desert_sandstone4', x: 36, y: 12, type: 'sandstone', icon: '🧱', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'desert_sandstone5', x: 16, y: 20, type: 'sandstone', icon: '🧱', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'desert_sandstone6', x: 21, y: 18, type: 'sandstone', icon: '🧱', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'desert_sandstone7', x: 30, y: 20, type: 'sandstone', icon: '🧱', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'desert_sandstone8', x: 36, y: 20, type: 'sandstone', icon: '🧱', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'desert_sandstone9', x: 16, y: 28, type: 'sandstone', icon: '🧱', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'desert_sandstone10', x: 22, y: 29, type: 'sandstone', icon: '🧱', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'desert_sandstone11', x: 28, y: 26, type: 'sandstone', icon: '🧱', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'desert_sandstone12', x: 36, y: 28, type: 'sandstone', icon: '🧱', respawnMs: 90_000, yieldAmount: 1 },
+];
+
+export const DESERT_BIOME: BiomeConfig = {
+  id: 'desert',
+  name: 'Sandscar Desert',
+  mapW: DESERT_MAP_W,
+  mapH: DESERT_MAP_H,
+  terrainAt: desertTerrainAt,
+  plots: DESERT_PLOTS,
+  resourceNodes: DESERT_RESOURCE_NODES,
+  decorations: [],
+  paths: [],
+  doors: { north: 'homestead' },
+  homesteadsAllowed: true,
+  allowedCrops: ['melon', 'pepper', 'onion'],
+};
+
 export const BIOMES: Record<BiomeId, BiomeConfig> = {
   homestead: HOMESTEAD_BIOME,
   shop: SHOP_BIOME,
   fall: FALL_BIOME,
   snow: SNOW_BIOME,
+  desert: DESERT_BIOME,
 };
 
 export const MATERIAL_ICONS: Record<string, string> = {};
@@ -483,6 +549,9 @@ export const CROPS: Record<string, CropConfig> = {
   carrot: { id: 'carrot', name: 'Carrot', icon: '🥕', growTimeMs: 30_000, yieldAmount: 3, plantCost: 3 },
   cabbage: { id: 'cabbage', name: 'Cabbage', icon: '🥬', growTimeMs: 60_000, yieldAmount: 4, plantCost: 5 },
   turnip: { id: 'turnip', name: 'Turnip', icon: '🫜', growTimeMs: 90_000, yieldAmount: 6, plantCost: 8 },
+  onion: { id: 'onion', name: 'Onion', icon: '🧅', growTimeMs: 30_000, yieldAmount: 3, plantCost: 3 },
+  pepper: { id: 'pepper', name: 'Pepper', icon: '🫑', growTimeMs: 60_000, yieldAmount: 4, plantCost: 5 },
+  melon: { id: 'melon', name: 'Melon', icon: '🍈', growTimeMs: 90_000, yieldAmount: 6, plantCost: 8 },
   pumpkin: { id: 'pumpkin', name: 'Pumpkin', icon: '🎃', growTimeMs: 90_000, yieldAmount: 6, plantCost: 8 },
 };
 
@@ -571,6 +640,15 @@ export const CRAFT_RECIPES: Record<string, CraftRecipeConfig> = {
   stoneHatchet: { id: 'stoneHatchet', name: 'Stone Hatchet', icon: '🪓', category: 'weapons', inputs: { wood: 3, stone: 4 }, outputQty: 1, craftTimeMs: 45_000, damage: 20 },
   huntingBow: { id: 'huntingBow', name: 'Hunting Bow', icon: '🏹', category: 'weapons', inputs: { hardwood: 4, flint: 3 }, outputQty: 1, craftTimeMs: 60_000, damage: 30 },
   iceSpear: { id: 'iceSpear', name: 'Ice Spear', icon: '🔱', category: 'weapons', inputs: { pine: 4, ice: 3 }, outputQty: 1, craftTimeMs: 60_000, damage: 35 },
+  cactusTools: { id: 'cactusTools', name: 'Cactus Tools', icon: '🛠️', category: 'tools', inputs: { cactus: 3, sandstone: 2 }, outputQty: 1, craftTimeMs: 45_000 },
+  cactusFurniture: { id: 'cactusFurniture', name: 'Cactus Furniture', icon: '🪑', category: 'goods', inputs: { cactus: 6 }, outputQty: 1, craftTimeMs: 45_000 },
+  sandstoneCarving: { id: 'sandstoneCarving', name: 'Sandstone Carving', icon: '🗿', category: 'goods', inputs: { sandstone: 4 }, outputQty: 1, craftTimeMs: 45_000 },
+  cactusToolbox: { id: 'cactusToolbox', name: 'Cactus Toolbox', icon: '🧰', category: 'tools', inputs: { cactusTools: 2, cactusFurniture: 1 }, outputQty: 1, craftTimeMs: 90_000 },
+  pickledOnion: { id: 'pickledOnion', name: 'Pickled Onion', icon: '🥫', category: 'food', inputs: { onion: 3 }, outputQty: 2, craftTimeMs: 20_000 },
+  stuffedPepper: { id: 'stuffedPepper', name: 'Stuffed Pepper', icon: '🌶️', category: 'food', inputs: { pepper: 2 }, outputQty: 1, craftTimeMs: 20_000 },
+  melonJuice: { id: 'melonJuice', name: 'Melon Juice', icon: '🥤', category: 'food', inputs: { melon: 2 }, outputQty: 1, craftTimeMs: 20_000 },
+  desertFeast: { id: 'desertFeast', name: 'Desert Feast', icon: '🏜️', category: 'food', inputs: { pickledOnion: 1, stuffedPepper: 1, melonJuice: 1 }, outputQty: 1, craftTimeMs: 75_000 },
+  cactusBlade: { id: 'cactusBlade', name: 'Cactus Spike Blade', icon: '🗡️', category: 'weapons', inputs: { cactus: 4, sandstone: 3 }, outputQty: 1, craftTimeMs: 60_000, damage: 32 },
 };
 
 // ---------- General Store (only usable while in the Shop biome) ----------
@@ -616,6 +694,18 @@ export const SELL_PRICES: Record<string, number> = {
   stoneHatchet: 4,
   huntingBow: 6,
   iceSpear: 7,
+  onion: 1,
+  pepper: 1,
+  melon: 1,
+  cactusTools: 2,
+  cactusFurniture: 2,
+  sandstoneCarving: 2,
+  cactusToolbox: 8,
+  pickledOnion: 1,
+  stuffedPepper: 1,
+  melonJuice: 2,
+  desertFeast: 12,
+  cactusBlade: 7,
 };
 
 export const DEMAND_STEP = 3;

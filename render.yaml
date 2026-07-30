@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: oldwest-frontier
+    name: extreme-frontier
     env: node
     plan: free
     buildCommand: npm run build

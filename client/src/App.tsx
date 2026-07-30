@@ -569,7 +569,7 @@ export default function App() {
                   'cell',
                   terrain === 'water' && 'cell-water',
                   terrain === 'grass' && !plot && !isPath && !isDoorTile && !isShopBuildingTile &&
-                    (world.biomeId === 'fall' ? 'cell-grass-fall' : world.biomeId === 'snow' ? 'cell-grass-snow' : 'cell-grass'),
+                    (world.biomeId === 'fall' ? 'cell-grass-fall' : world.biomeId === 'snow' ? 'cell-grass-snow' : world.biomeId === 'desert' ? 'cell-grass-desert' : 'cell-grass'),
                   isShopBuildingTile && 'cell-shop-building',
                   isPath && 'cell-path',
                   isDoorTile && 'cell-door',
