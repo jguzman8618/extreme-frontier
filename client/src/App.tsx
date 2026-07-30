@@ -534,7 +534,8 @@ export default function App() {
                 const cls = [
                   'cell',
                   terrain === 'water' && 'cell-water',
-                  terrain === 'grass' && !plot && !isPath && !isDoorTile && !isShopBuildingTile && (world.biomeId === 'fall' ? 'cell-grass-fall' : 'cell-grass'),
+                  terrain === 'grass' && !plot && !isPath && !isDoorTile && !isShopBuildingTile &&
+                    (world.biomeId === 'fall' ? 'cell-grass-fall' : world.biomeId === 'snow' ? 'cell-grass-snow' : 'cell-grass'),
                   isShopBuildingTile && 'cell-shop-building',
                   isPath && 'cell-path',
                   isDoorTile && 'cell-door',

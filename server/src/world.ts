@@ -6,7 +6,7 @@
 // meaningful within a single biome; the same (x,y) exists independently
 // in every biome.
 
-export type BiomeId = 'homestead' | 'shop' | 'fall';
+export type BiomeId = 'homestead' | 'shop' | 'fall' | 'snow';
 export type Direction = 'north' | 'south' | 'east' | 'west';
 export type Terrain = 'grass' | 'water';
 
@@ -152,7 +152,7 @@ export const HOMESTEAD_BIOME: BiomeConfig = {
   resourceNodes: HOMESTEAD_RESOURCE_NODES,
   decorations: [],
   paths: [],
-  doors: { east: 'shop', west: 'fall' },
+  doors: { east: 'shop', west: 'fall', north: 'snow' },
   homesteadsAllowed: true,
   allowedCrops: ['wheat', 'corn', 'potato'],
 };
@@ -349,10 +349,76 @@ export const FALL_BIOME: BiomeConfig = {
   allowedCrops: ['pumpkin', 'squash', 'cranberry'],
 };
 
+
+// ==================== SNOW BIOME ====================
+// A third homesteadable biome, reached from the Homestead's north door.
+// Its own resources (Pine, Ice) and crops (Carrot, Cabbage, Turnip).
+
+const SNOW_MAP_W = 40;
+const SNOW_MAP_H = 40;
+
+function snowTerrainAt(_x: number, _y: number): Terrain {
+  return 'grass';
+}
+
+export const SNOW_PLOTS: PlotConfig[] = [
+  { id: 'snow_plot1', x: 2, y: 1, size: 3 }, { id: 'snow_plot2', x: 9, y: 1, size: 5 },
+  { id: 'snow_plot3', x: 22, y: 1, size: 5 }, { id: 'snow_plot4', x: 29, y: 1, size: 3 },
+  { id: 'snow_plot5', x: 2, y: 8, size: 5 }, { id: 'snow_plot6', x: 9, y: 8, size: 3 },
+  { id: 'snow_plot7', x: 22, y: 8, size: 3 }, { id: 'snow_plot8', x: 29, y: 8, size: 7 },
+  { id: 'snow_plot9', x: 2, y: 17, size: 3 }, { id: 'snow_plot10', x: 9, y: 17, size: 7 },
+  { id: 'snow_plot11', x: 22, y: 17, size: 5 }, { id: 'snow_plot12', x: 29, y: 17, size: 3 },
+  { id: 'snow_plot13', x: 2, y: 26, size: 5 }, { id: 'snow_plot14', x: 9, y: 26, size: 3 },
+  { id: 'snow_plot15', x: 22, y: 26, size: 3 }, { id: 'snow_plot16', x: 29, y: 26, size: 5 },
+];
+
+export const SNOW_RESOURCE_NODES: ResourceNodeConfig[] = [
+  { id: 'snow_pine1', x: 3, y: 4, type: 'pine', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'snow_pine2', x: 8, y: 2, type: 'pine', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'snow_pine3', x: 16, y: 4, type: 'pine', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'snow_pine4', x: 21, y: 2, type: 'pine', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'snow_pine5', x: 30, y: 4, type: 'pine', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'snow_pine6', x: 36, y: 4, type: 'pine', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'snow_pine7', x: 2, y: 13, type: 'pine', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'snow_pine8', x: 10, y: 12, type: 'pine', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'snow_pine9', x: 3, y: 20, type: 'pine', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'snow_pine10', x: 8, y: 18, type: 'pine', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'snow_pine11', x: 1, y: 26, type: 'pine', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'snow_pine12', x: 9, y: 29, type: 'pine', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'snow_ice1', x: 16, y: 12, type: 'ice', icon: '🧊', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'snow_ice2', x: 23, y: 12, type: 'ice', icon: '🧊', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'snow_ice3', x: 28, y: 10, type: 'ice', icon: '🧊', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'snow_ice4', x: 36, y: 12, type: 'ice', icon: '🧊', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'snow_ice5', x: 16, y: 20, type: 'ice', icon: '🧊', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'snow_ice6', x: 21, y: 18, type: 'ice', icon: '🧊', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'snow_ice7', x: 30, y: 20, type: 'ice', icon: '🧊', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'snow_ice8', x: 36, y: 20, type: 'ice', icon: '🧊', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'snow_ice9', x: 16, y: 28, type: 'ice', icon: '🧊', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'snow_ice10', x: 22, y: 29, type: 'ice', icon: '🧊', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'snow_ice11', x: 28, y: 26, type: 'ice', icon: '🧊', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'snow_ice12', x: 36, y: 28, type: 'ice', icon: '🧊', respawnMs: 90_000, yieldAmount: 1 },
+];
+
+export const SNOW_BIOME: BiomeConfig = {
+  id: 'snow',
+  name: 'Snowpeak',
+  mapW: SNOW_MAP_W,
+  mapH: SNOW_MAP_H,
+  terrainAt: snowTerrainAt,
+  plots: SNOW_PLOTS,
+  resourceNodes: SNOW_RESOURCE_NODES,
+  decorations: [],
+  paths: [],
+  doors: { south: 'homestead' },
+  homesteadsAllowed: true,
+  allowedCrops: ['carrot', 'cabbage', 'turnip'],
+};
+
 export const BIOMES: Record<BiomeId, BiomeConfig> = {
   homestead: HOMESTEAD_BIOME,
   shop: SHOP_BIOME,
   fall: FALL_BIOME,
+  snow: SNOW_BIOME,
 };
 
 export const MATERIAL_ICONS: Record<string, string> = {};
@@ -412,6 +478,9 @@ export const CROPS: Record<string, CropConfig> = {
   potato: { id: 'potato', name: 'Potato', icon: '🥔', growTimeMs: 90_000, yieldAmount: 6 },
   squash: { id: 'squash', name: 'Squash', icon: '🥒', growTimeMs: 30_000, yieldAmount: 3 },
   cranberry: { id: 'cranberry', name: 'Cranberry', icon: '🔴', growTimeMs: 60_000, yieldAmount: 4 },
+  carrot: { id: 'carrot', name: 'Carrot', icon: '🥕', growTimeMs: 30_000, yieldAmount: 3 },
+  cabbage: { id: 'cabbage', name: 'Cabbage', icon: '🥬', growTimeMs: 60_000, yieldAmount: 4 },
+  turnip: { id: 'turnip', name: 'Turnip', icon: '🫜', growTimeMs: 90_000, yieldAmount: 6 },
   pumpkin: { id: 'pumpkin', name: 'Pumpkin', icon: '🎃', growTimeMs: 90_000, yieldAmount: 6 },
 };
 
@@ -487,6 +556,14 @@ export const CRAFT_RECIPES: Record<string, CraftRecipeConfig> = {
   hardwoodFurniture: { id: 'hardwoodFurniture', name: 'Hardwood Furniture', icon: '🪵', category: 'goods', inputs: { hardwood: 6 }, outputQty: 1, craftTimeMs: 45_000 },
   flintBlade: { id: 'flintBlade', name: 'Flint Blade', icon: '🔪', category: 'goods', inputs: { flint: 4 }, outputQty: 1, craftTimeMs: 45_000 },
   hardwoodToolbox: { id: 'hardwoodToolbox', name: 'Hardwood Toolbox', icon: '🧰', category: 'goods', inputs: { hardwoodTools: 2, hardwoodFurniture: 1 }, outputQty: 1, craftTimeMs: 90_000 },
+  pineTools: { id: 'pineTools', name: 'Pine Tools', icon: '🛠️', category: 'goods', inputs: { pine: 3, ice: 2 }, outputQty: 1, craftTimeMs: 45_000 },
+  pineFurniture: { id: 'pineFurniture', name: 'Pine Furniture', icon: '🪑', category: 'goods', inputs: { pine: 6 }, outputQty: 1, craftTimeMs: 45_000 },
+  iceCarving: { id: 'iceCarving', name: 'Ice Carving', icon: '🗿', category: 'goods', inputs: { ice: 4 }, outputQty: 1, craftTimeMs: 45_000 },
+  pineToolbox: { id: 'pineToolbox', name: 'Pine Toolbox', icon: '🧰', category: 'goods', inputs: { pineTools: 2, pineFurniture: 1 }, outputQty: 1, craftTimeMs: 90_000 },
+  carrotSoup: { id: 'carrotSoup', name: 'Carrot Soup', icon: '🍲', category: 'food', inputs: { carrot: 3 }, outputQty: 2, craftTimeMs: 20_000 },
+  cabbageRolls: { id: 'cabbageRolls', name: 'Cabbage Rolls', icon: '🥙', category: 'food', inputs: { cabbage: 2 }, outputQty: 1, craftTimeMs: 20_000 },
+  turnipMash: { id: 'turnipMash', name: 'Turnip Mash', icon: '🍚', category: 'food', inputs: { turnip: 2 }, outputQty: 1, craftTimeMs: 20_000 },
+  wintersFeast: { id: 'wintersFeast', name: "Winter's Feast", icon: '❄️', category: 'food', inputs: { carrotSoup: 1, cabbageRolls: 1, turnipMash: 1 }, outputQty: 1, craftTimeMs: 75_000 },
 };
 
 // ---------- General Store (only usable while in the Shop biome) ----------
@@ -517,6 +594,17 @@ export const SELL_PRICES: Record<string, number> = {
   hardwoodFurniture: 2,
   flintBlade: 2,
   hardwoodToolbox: 8,
+  carrot: 1,
+  cabbage: 1,
+  turnip: 1,
+  pineTools: 2,
+  pineFurniture: 2,
+  iceCarving: 2,
+  pineToolbox: 8,
+  carrotSoup: 2,
+  cabbageRolls: 1,
+  turnipMash: 1,
+  wintersFeast: 12,
 };
 
 export const DEMAND_STEP = 3;
