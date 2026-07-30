@@ -6,7 +6,7 @@
 // meaningful within a single biome; the same (x,y) exists independently
 // in every biome.
 
-export type BiomeId = 'homestead' | 'shop';
+export type BiomeId = 'homestead' | 'shop' | 'fall';
 export type Direction = 'north' | 'south' | 'east' | 'west';
 export type Terrain = 'grass' | 'water';
 
@@ -21,7 +21,8 @@ export interface ResourceNodeConfig {
   id: string;
   x: number;
   y: number;
-  type: 'wood' | 'stone';
+  type: string;
+  icon: string;
   respawnMs: number;
   yieldAmount: number;
 }
@@ -110,34 +111,34 @@ export const HOMESTEAD_TIERS: Record<number, { label: string; cost: number }> = 
 export const MAX_HOMESTEADS_PER_PLAYER = 3;
 
 export const HOMESTEAD_RESOURCE_NODES: ResourceNodeConfig[] = [
-  { id: 'tree1', x: 2, y: 5, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'tree2', x: 14, y: 5, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'tree3', x: 31, y: 5, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'tree4', x: 2, y: 15, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'tree5', x: 14, y: 15, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'tree6', x: 31, y: 15, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'tree7', x: 2, y: 25, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'tree8', x: 14, y: 25, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'tree9', x: 31, y: 25, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'tree10', x: 2, y: 38, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'tree11', x: 14, y: 35, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'tree12', x: 31, y: 38, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'tree13', x: 8, y: 5, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'tree14', x: 16, y: 5, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock1', x: 17, y: 15, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'rock2', x: 37, y: 5, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'rock3', x: 25, y: 15, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'rock4', x: 37, y: 15, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'rock5', x: 8, y: 25, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'rock6', x: 20, y: 25, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'rock7', x: 25, y: 25, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'rock8', x: 37, y: 25, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'rock9', x: 8, y: 35, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'rock10', x: 20, y: 35, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'rock11', x: 25, y: 38, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'rock12', x: 37, y: 35, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'rock13', x: 24, y: 6, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'rock14', x: 6, y: 24, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'tree1', x: 2, y: 5, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'tree2', x: 14, y: 5, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'tree3', x: 31, y: 5, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'tree4', x: 2, y: 15, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'tree5', x: 14, y: 15, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'tree6', x: 31, y: 15, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'tree7', x: 2, y: 25, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'tree8', x: 14, y: 25, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'tree9', x: 31, y: 25, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'tree10', x: 2, y: 38, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'tree11', x: 14, y: 35, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'tree12', x: 31, y: 38, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'tree13', x: 8, y: 5, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'tree14', x: 16, y: 5, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'rock1', x: 17, y: 15, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'rock2', x: 37, y: 5, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'rock3', x: 25, y: 15, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'rock4', x: 37, y: 15, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'rock5', x: 8, y: 25, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'rock6', x: 20, y: 25, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'rock7', x: 25, y: 25, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'rock8', x: 37, y: 25, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'rock9', x: 8, y: 35, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'rock10', x: 20, y: 35, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'rock11', x: 25, y: 38, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'rock12', x: 37, y: 35, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'rock13', x: 24, y: 6, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'rock14', x: 6, y: 24, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
 ];
 
 export const HOMESTEAD_BIOME: BiomeConfig = {
@@ -150,7 +151,7 @@ export const HOMESTEAD_BIOME: BiomeConfig = {
   resourceNodes: HOMESTEAD_RESOURCE_NODES,
   decorations: [],
   paths: [],
-  doors: { east: 'shop' },
+  doors: { east: 'shop', west: 'fall' },
   homesteadsAllowed: true,
 };
 
@@ -238,30 +239,30 @@ function buildShopPaths(): { x: number; y: number }[] {
 }
 
 export const SHOP_RESOURCE_NODES: ResourceNodeConfig[] = [
-  { id: 'shop_tree1', x: 5, y: 25, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'shop_tree2', x: 10, y: 32, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'shop_tree3', x: 25, y: 32, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'shop_tree4', x: 35, y: 30, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'shop_tree5', x: 3, y: 15, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'shop_tree6', x: 36, y: 20, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'shop_tree7', x: 15, y: 25, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'shop_tree8', x: 8, y: 35, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'shop_tree9', x: 30, y: 3, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'shop_tree10', x: 2, y: 5, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'shop_tree11', x: 2, y: 32, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'shop_tree12', x: 22, y: 38, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'shop_rock1', x: 8, y: 28, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'shop_rock2', x: 20, y: 35, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'shop_rock3', x: 30, y: 35, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'shop_rock4', x: 5, y: 10, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'shop_rock5', x: 12, y: 5, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'shop_rock6', x: 36, y: 25, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'shop_rock7', x: 22, y: 25, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'shop_rock8', x: 15, y: 35, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'shop_rock9', x: 36, y: 10, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'shop_rock10', x: 38, y: 35, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'shop_rock11', x: 8, y: 3, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
-  { id: 'shop_rock12', x: 38, y: 15, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'shop_tree1', x: 5, y: 25, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'shop_tree2', x: 10, y: 32, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'shop_tree3', x: 25, y: 32, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'shop_tree4', x: 35, y: 30, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'shop_tree5', x: 3, y: 15, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'shop_tree6', x: 36, y: 20, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'shop_tree7', x: 15, y: 25, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'shop_tree8', x: 8, y: 35, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'shop_tree9', x: 30, y: 3, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'shop_tree10', x: 2, y: 5, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'shop_tree11', x: 2, y: 32, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'shop_tree12', x: 22, y: 38, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'shop_rock1', x: 8, y: 28, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'shop_rock2', x: 20, y: 35, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'shop_rock3', x: 30, y: 35, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'shop_rock4', x: 5, y: 10, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'shop_rock5', x: 12, y: 5, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'shop_rock6', x: 36, y: 25, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'shop_rock7', x: 22, y: 25, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'shop_rock8', x: 15, y: 35, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'shop_rock9', x: 36, y: 10, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'shop_rock10', x: 38, y: 35, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'shop_rock11', x: 8, y: 3, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'shop_rock12', x: 38, y: 15, type: 'stone', icon: '🪨', respawnMs: 90_000, yieldAmount: 1 },
 ];
 
 export const SHOP_BIOME: BiomeConfig = {
@@ -279,9 +280,73 @@ export const SHOP_BIOME: BiomeConfig = {
   building: { ...SHOP_BUILDING, icon: '🏪' },
 };
 
+
+// ==================== FALL BIOME ====================
+// A second homesteadable biome, reached from the Homestead's west door.
+// Its own resources (Hardwood, Flint) and crops (Pumpkin, Squash,
+// Cranberry) — no river, smaller than the Homestead (12 plots).
+
+const FALL_MAP_W = 40;
+const FALL_MAP_H = 40;
+
+function fallTerrainAt(_x: number, _y: number): Terrain {
+  return 'grass';
+}
+
+export const FALL_PLOTS: PlotConfig[] = [
+  { id: 'fall_plot1', x: 2, y: 1, size: 3 }, { id: 'fall_plot2', x: 9, y: 1, size: 5 },
+  { id: 'fall_plot3', x: 22, y: 1, size: 5 }, { id: 'fall_plot4', x: 29, y: 1, size: 3 },
+  { id: 'fall_plot5', x: 2, y: 8, size: 5 }, { id: 'fall_plot6', x: 9, y: 8, size: 3 },
+  { id: 'fall_plot7', x: 22, y: 8, size: 3 }, { id: 'fall_plot8', x: 29, y: 8, size: 7 },
+  { id: 'fall_plot9', x: 2, y: 17, size: 3 }, { id: 'fall_plot10', x: 9, y: 17, size: 7 },
+  { id: 'fall_plot11', x: 22, y: 17, size: 5 }, { id: 'fall_plot12', x: 29, y: 17, size: 3 },
+];
+
+export const FALL_RESOURCE_NODES: ResourceNodeConfig[] = [
+  { id: 'fall_hardwood1', x: 3, y: 4, type: 'hardwood', icon: '🌳', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'fall_hardwood2', x: 8, y: 2, type: 'hardwood', icon: '🌳', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'fall_hardwood3', x: 16, y: 4, type: 'hardwood', icon: '🌳', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'fall_hardwood4', x: 21, y: 2, type: 'hardwood', icon: '🌳', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'fall_hardwood5', x: 30, y: 4, type: 'hardwood', icon: '🌳', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'fall_hardwood6', x: 36, y: 4, type: 'hardwood', icon: '🌳', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'fall_hardwood7', x: 2, y: 13, type: 'hardwood', icon: '🌳', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'fall_hardwood8', x: 10, y: 12, type: 'hardwood', icon: '🌳', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'fall_hardwood9', x: 3, y: 20, type: 'hardwood', icon: '🌳', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'fall_hardwood10', x: 8, y: 18, type: 'hardwood', icon: '🌳', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'fall_hardwood11', x: 3, y: 28, type: 'hardwood', icon: '🌳', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'fall_hardwood12', x: 10, y: 28, type: 'hardwood', icon: '🌳', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'fall_flint1', x: 16, y: 12, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'fall_flint2', x: 23, y: 12, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'fall_flint3', x: 28, y: 10, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'fall_flint4', x: 36, y: 12, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'fall_flint5', x: 16, y: 20, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'fall_flint6', x: 21, y: 18, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'fall_flint7', x: 30, y: 20, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'fall_flint8', x: 36, y: 20, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'fall_flint9', x: 16, y: 28, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'fall_flint10', x: 23, y: 28, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'fall_flint11', x: 30, y: 28, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'fall_flint12', x: 36, y: 28, type: 'flint', icon: '⚫', respawnMs: 90_000, yieldAmount: 1 },
+];
+
+export const FALL_BIOME: BiomeConfig = {
+  id: 'fall',
+  name: 'Fall Valley',
+  mapW: FALL_MAP_W,
+  mapH: FALL_MAP_H,
+  terrainAt: fallTerrainAt,
+  plots: FALL_PLOTS,
+  resourceNodes: FALL_RESOURCE_NODES,
+  decorations: [],
+  paths: [],
+  doors: { east: 'homestead' },
+  homesteadsAllowed: true,
+};
+
 export const BIOMES: Record<BiomeId, BiomeConfig> = {
   homestead: HOMESTEAD_BIOME,
   shop: SHOP_BIOME,
+  fall: FALL_BIOME,
 };
 
 export function isInsideBuilding(x: number, y: number, b: { x: number; y: number; w: number; h: number }): boolean {
@@ -334,6 +399,9 @@ export const CROPS: Record<string, CropConfig> = {
   wheat: { id: 'wheat', name: 'Wheat', icon: '🌾', growTimeMs: 30_000, yieldAmount: 3 },
   corn: { id: 'corn', name: 'Corn', icon: '🌽', growTimeMs: 60_000, yieldAmount: 4 },
   potato: { id: 'potato', name: 'Potato', icon: '🥔', growTimeMs: 90_000, yieldAmount: 6 },
+  squash: { id: 'squash', name: 'Squash', icon: '🥒', growTimeMs: 30_000, yieldAmount: 3 },
+  cranberry: { id: 'cranberry', name: 'Cranberry', icon: '🔴', growTimeMs: 60_000, yieldAmount: 4 },
+  pumpkin: { id: 'pumpkin', name: 'Pumpkin', icon: '🎃', growTimeMs: 90_000, yieldAmount: 6 },
 };
 
 // ---------- Buildings (placed on your own plot) ----------
@@ -400,6 +468,11 @@ export const CRAFT_RECIPES: Record<string, CraftRecipeConfig> = {
   wagonWheel: { id: 'wagonWheel', name: 'Wagon Wheel', icon: '🛞', category: 'goods', inputs: { wood: 4, stone: 3 }, outputQty: 1, craftTimeMs: 60_000 },
   toolbox: { id: 'toolbox', name: 'Toolbox', icon: '🧰', category: 'goods', inputs: { tools: 2, furniture: 1 }, outputQty: 1, craftTimeMs: 90_000 },
   feast: { id: 'feast', name: 'Feast', icon: '🍲', category: 'food', inputs: { bread: 2, cheese: 1, omelette: 1 }, outputQty: 1, craftTimeMs: 75_000 },
+  hardwoodTools: { id: 'hardwoodTools', name: 'Hardwood Tools', icon: '🔨', category: 'goods', inputs: { hardwood: 3, flint: 2 }, outputQty: 1, craftTimeMs: 45_000 },
+  pumpkinPie: { id: 'pumpkinPie', name: 'Pumpkin Pie', icon: '🥧', category: 'food', inputs: { pumpkin: 2 }, outputQty: 1, craftTimeMs: 20_000 },
+  cranberrySauce: { id: 'cranberrySauce', name: 'Cranberry Sauce', icon: '🍯', category: 'food', inputs: { cranberry: 3 }, outputQty: 2, craftTimeMs: 20_000 },
+  roastedSquash: { id: 'roastedSquash', name: 'Roasted Squash', icon: '🍠', category: 'food', inputs: { squash: 2 }, outputQty: 1, craftTimeMs: 20_000 },
+  harvestFeast: { id: 'harvestFeast', name: 'Harvest Feast', icon: '🦃', category: 'food', inputs: { pumpkinPie: 1, cranberrySauce: 1, roastedSquash: 1 }, outputQty: 1, craftTimeMs: 75_000 },
 };
 
 // ---------- General Store (only usable while in the Shop biome) ----------
@@ -419,6 +492,14 @@ export const SELL_PRICES: Record<string, number> = {
   wagonWheel: 3,
   toolbox: 6,
   feast: 12,
+  squash: 1,
+  cranberry: 1,
+  pumpkin: 1,
+  hardwoodTools: 3,
+  pumpkinPie: 2,
+  cranberrySauce: 1,
+  roastedSquash: 1,
+  harvestFeast: 12,
 };
 
 export const DEMAND_STEP = 3;

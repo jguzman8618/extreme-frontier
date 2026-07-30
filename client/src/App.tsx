@@ -489,7 +489,7 @@ export default function App() {
                 const cls = [
                   'cell',
                   terrain === 'water' && 'cell-water',
-                  terrain === 'grass' && !plot && !isPath && !isDoorTile && !isShopBuildingTile && 'cell-grass',
+                  terrain === 'grass' && !plot && !isPath && !isDoorTile && !isShopBuildingTile && (world.biomeId === 'fall' ? 'cell-grass-fall' : 'cell-grass'),
                   isShopBuildingTile && 'cell-shop-building',
                   isPath && 'cell-path',
                   isDoorTile && 'cell-door',
@@ -516,7 +516,7 @@ export default function App() {
                 else if (animal) content = world.livestock[animal.type]?.icon ?? '🐾';
                 else if (crop) content = world.crops[crop.cropType]?.icon ?? '🌱';
                 else if (node && node.depletedUntil <= Date.now()) {
-                  content = node.type === 'wood' ? '🌲' : '🪨';
+                  content = node.icon;
                 }
 
                 return (
@@ -682,7 +682,7 @@ export default function App() {
                 const available = n.depletedUntil <= Date.now();
                 return (
                   <button key={n.id} className="crop-option" disabled={!available} onClick={() => handleGather(n.id)}>
-                    {n.type === 'wood' ? '🌲' : '🪨'} Gather {n.type} {!available && `(back in ${Math.max(0, Math.ceil((n.depletedUntil - Date.now()) / 1000))}s)`}
+                    {n.icon} Gather {n.type} {!available && `(back in ${Math.max(0, Math.ceil((n.depletedUntil - Date.now()) / 1000))}s)`}
                   </button>
                 );
               })}

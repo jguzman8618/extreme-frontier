@@ -24,7 +24,8 @@ export interface ResourceNodeState {
   id: string;
   x: number;
   y: number;
-  type: 'wood' | 'stone';
+  type: string;
+  icon: string;
   respawnMs: number;
   yieldAmount: number;
   depletedUntil: number;
