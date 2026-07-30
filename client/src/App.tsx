@@ -270,6 +270,7 @@ export default function App() {
   useEffect(() => {
     if (!token || !state || !world) return;
     function onKeyDown(e: KeyboardEvent) {
+      if (e.repeat) return;
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
       let dx = 0, dy = 0;
