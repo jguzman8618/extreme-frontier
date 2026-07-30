@@ -298,6 +298,7 @@ export default function App() {
   }, [token]);
 
   const playerPosRef = useRef({ x: 0, y: 0 });
+  const moveChainRef = useRef<Promise<unknown>>(Promise.resolve());
   useEffect(() => {
     if (state) playerPosRef.current = { x: state.player.x, y: state.player.y };
   }, [state?.player.x, state?.player.y]);
@@ -329,17 +330,20 @@ export default function App() {
         return { ...prev, player: { ...prev.player, x: nx, y: ny }, players };
       });
 
-      move(token!, nx, ny).catch((err) => {
-        showError(err.message);
-        if (playerPosRef.current.x === nx && playerPosRef.current.y === ny) {
-          playerPosRef.current = { x: prevX, y: prevY };
-        }
-        setState((prev) => {
-          if (!prev || prev.player.x !== nx || prev.player.y !== ny) return prev;
-          const players = prev.players.map((p) => (p.id === prev.player.id ? { ...p, x: prevX, y: prevY } : p));
-          return { ...prev, player: { ...prev.player, x: prevX, y: prevY }, players };
+      moveChainRef.current = moveChainRef.current
+        .catch(() => {})
+        .then(() => move(token!, nx, ny))
+        .catch((err) => {
+          showError(err.message);
+          if (playerPosRef.current.x === nx && playerPosRef.current.y === ny) {
+            playerPosRef.current = { x: prevX, y: prevY };
+          }
+          setState((prev) => {
+            if (!prev || prev.player.x !== nx || prev.player.y !== ny) return prev;
+            const players = prev.players.map((p) => (p.id === prev.player.id ? { ...p, x: prevX, y: prevY } : p));
+            return { ...prev, player: { ...prev.player, x: prevX, y: prevY }, players };
+          });
         });
-      });
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
