@@ -262,6 +262,11 @@ export default function App() {
     return () => { s.disconnect(); };
   }, [token]);
 
+  const playerPosRef = useRef({ x: 0, y: 0 });
+  useEffect(() => {
+    if (state) playerPosRef.current = { x: state.player.x, y: state.player.y };
+  }, [state?.player.x, state?.player.y]);
+
   useEffect(() => {
     if (!token || !state || !world) return;
     function onKeyDown(e: KeyboardEvent) {
@@ -275,21 +280,26 @@ export default function App() {
       else return;
       e.preventDefault();
 
-      let prevX = 0, prevY = 0, nx = 0, ny = 0, myId = '';
+      const prevX = playerPosRef.current.x;
+      const prevY = playerPosRef.current.y;
+      const nx = prevX + dx;
+      const ny = prevY + dy;
+      playerPosRef.current = { x: nx, y: ny };
+
       setState((prev) => {
         if (!prev) return prev;
-        prevX = prev.player.x; prevY = prev.player.y; myId = prev.player.id;
-        nx = prevX + dx; ny = prevY + dy;
-        const players = prev.players.map((p) => (p.id === myId ? { ...p, x: nx, y: ny } : p));
+        const players = prev.players.map((p) => (p.id === prev.player.id ? { ...p, x: nx, y: ny } : p));
         return { ...prev, player: { ...prev.player, x: nx, y: ny }, players };
       });
 
       move(token!, nx, ny).catch((err) => {
         showError(err.message);
-        // Revert, but only if nothing newer has already moved us elsewhere.
+        if (playerPosRef.current.x === nx && playerPosRef.current.y === ny) {
+          playerPosRef.current = { x: prevX, y: prevY };
+        }
         setState((prev) => {
           if (!prev || prev.player.x !== nx || prev.player.y !== ny) return prev;
-          const players = prev.players.map((p) => (p.id === myId ? { ...p, x: prevX, y: prevY } : p));
+          const players = prev.players.map((p) => (p.id === prev.player.id ? { ...p, x: prevX, y: prevY } : p));
           return { ...prev, player: { ...prev.player, x: prevX, y: prevY }, players };
         });
       });
