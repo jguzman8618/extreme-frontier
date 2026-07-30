@@ -113,14 +113,21 @@ export default function App() {
       });
   }, [token]);
 
-  // Fetch the current biome's world config whenever the player's biome
-  // changes (initial load, or after traveling through a door).
+  // Whenever the player's biome changes (initial load, or after traveling
+  // through a door), refetch BOTH the static world config AND the live
+  // game state. Fetching only world left resourceNodes/buildings/crops/
+  // livestock/players frozen on whatever biome we were in before —
+  // meaning after traveling, everything you could interact with was
+  // stale data from the old biome even though the map itself looked right.
+  const lastFetchedBiome = useRef<string | null>(null);
   useEffect(() => {
-    if (!state) return;
+    if (!state || !token) return;
     const biome = state.player.biome;
-    if (world && world.biomeId === biome) return;
+    if (lastFetchedBiome.current === biome) return;
+    lastFetchedBiome.current = biome;
     getWorld(biome).then(setWorld).catch((e) => showError(e.message));
-  }, [state?.player.biome]);
+    getState(token).then(setState).catch((e) => showError(e.message));
+  }, [state?.player.biome, token]);
 
   useEffect(() => {
     if (!world) return;
