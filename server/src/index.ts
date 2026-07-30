@@ -108,24 +108,33 @@ for (const biome of Object.values(BIOMES)) {
 // since a node was last placed, its stored position could now be inside
 // something solid. Fix that on boot rather than waiting for it to be
 // gathered again.
+function validateAndFixNodePosition(biomeId: BiomeId, node: { id: string }): void {
+  const row = db.prepare('SELECT x, y FROM resource_state WHERE node_id = ?').get(node.id) as { x: number; y: number } | undefined;
+  if (!row) return;
+  if (isWalkable(biomeId, row.x, row.y) && !plotAt(biomeId, row.x, row.y)) return;
+  const biome = BIOMES[biomeId];
+  const occupied = (x: number, y: number) =>
+    biome.resourceNodes.some((other) => {
+      if (other.id === node.id) return false;
+      const otherRow = db.prepare('SELECT x, y FROM resource_state WHERE node_id = ?').get(other.id) as { x: number; y: number } | undefined;
+      return otherRow?.x === x && otherRow?.y === y;
+    });
+  const fixed = randomFreeResourceSpot(biomeId, occupied);
+  db.prepare('UPDATE resource_state SET x = ?, y = ? WHERE node_id = ?').run(fixed.x, fixed.y, node.id);
+  console.log(`Fixed out-of-bounds resource node ${node.id} in ${biomeId}: moved to (${fixed.x},${fixed.y})`);
+}
+
 for (const [biomeId, biome] of Object.entries(BIOMES) as [BiomeId, typeof BIOMES[BiomeId]][]) {
-  for (const n of biome.resourceNodes) {
-    const row = db.prepare('SELECT x, y FROM resource_state WHERE node_id = ?').get(n.id) as { x: number; y: number } | undefined;
-    if (!row) continue;
-    if (!isWalkable(biomeId, row.x, row.y) || plotAt(biomeId, row.x, row.y)) {
-      const occupied = (x: number, y: number) =>
-        biome.resourceNodes.some((other) => other.id !== n.id &&
-          (db.prepare('SELECT x, y FROM resource_state WHERE node_id = ?').get(other.id) as { x: number; y: number } | undefined)?.x === x);
-      const fixed = randomFreeResourceSpot(biomeId, occupied);
-      db.prepare('UPDATE resource_state SET x = ?, y = ? WHERE node_id = ?').run(fixed.x, fixed.y, n.id);
-      console.log(`Fixed out-of-bounds resource node ${n.id} in ${biomeId}: moved to (${fixed.x},${fixed.y})`);
-    }
-  }
+  for (const n of biome.resourceNodes) validateAndFixNodePosition(biomeId, n);
 }
 
 function resourceNodeStatesForBiome(biomeId: BiomeId) {
   const nodes = BIOMES[biomeId].resourceNodes;
   if (nodes.length === 0) return [];
+  // Self-healing: re-validate every time state is fetched, not just at
+  // server boot — this way a bad position can never persist regardless
+  // of deploy/restart timing.
+  for (const n of nodes) validateAndFixNodePosition(biomeId, n);
   const rows = db.prepare('SELECT * FROM resource_state').all() as { node_id: string; x: number; y: number; depleted_until: number }[];
   const byId: Record<string, { x: number; y: number; depleted_until: number }> = {};
   for (const r of rows) byId[r.node_id] = r;
