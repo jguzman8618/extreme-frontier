@@ -156,6 +156,7 @@ body {
 .cell-shop { background: #4a3a5c; }
 
 .cell-icon { font-size: 9px; line-height: 1; pointer-events: none; }
+.cell-icon-shop { font-size: 22px; line-height: 1; pointer-events: none; z-index: 2; }
 .avatar {
   position: absolute;
   font-size: 10px;

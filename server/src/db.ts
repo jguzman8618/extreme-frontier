@@ -66,6 +66,23 @@ db.exec(`
     y INTEGER NOT NULL,
     depleted_until INTEGER NOT NULL DEFAULT 0
   );
+
+  -- Crafting now takes real time. One active job per player — inputs are
+  -- deducted when the job starts, output is added when collected.
+  CREATE TABLE IF NOT EXISTS crafting_jobs (
+    player_id TEXT PRIMARY KEY,
+    recipe_id TEXT NOT NULL,
+    started_at INTEGER NOT NULL,
+    FOREIGN KEY (player_id) REFERENCES players(id)
+  );
+
+  -- Supply-and-demand: tracks recent sold volume per item so the store
+  -- price dips as an item gets dumped and recovers over real time.
+  CREATE TABLE IF NOT EXISTS market_state (
+    item TEXT PRIMARY KEY,
+    sold_units REAL NOT NULL DEFAULT 0,
+    last_update INTEGER NOT NULL DEFAULT 0
+  );
 `);
 
 export default db;

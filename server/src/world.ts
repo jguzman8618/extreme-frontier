@@ -42,6 +42,8 @@ export const PLOTS: PlotConfig[] = [
   { id: 'plot11', x: 22, y: 17, size: 5 }, { id: 'plot12', x: 29, y: 17, size: 3 },
   { id: 'plot13', x: 2, y: 26, size: 5 }, { id: 'plot14', x: 9, y: 26, size: 3 },
   { id: 'plot15', x: 22, y: 26, size: 3 }, { id: 'plot16', x: 29, y: 26, size: 5 },
+  { id: 'plot17', x: 2, y: 33, size: 3 }, { id: 'plot18', x: 9, y: 33, size: 5 },
+  { id: 'plot19', x: 22, y: 33, size: 5 }, { id: 'plot20', x: 29, y: 33, size: 3 },
 ];
 
 // ---------- Homestead pricing tiers ----------
@@ -79,36 +81,37 @@ export interface ResourceNodeConfig {
 }
 
 // Placed in the gaps between homestead rows/columns — verified clear of
-// every plot and the river.
+// every plot and the river. Respawn times are deliberately long — this is
+// a long-term game, not a fast-money one. Stone is scarcer than wood.
 export const RESOURCE_NODES: ResourceNodeConfig[] = [
-  { id: 'tree1', x: 2, y: 5, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree2', x: 14, y: 5, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree3', x: 31, y: 5, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree4', x: 2, y: 15, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree5', x: 14, y: 15, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree6', x: 31, y: 15, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree7', x: 2, y: 25, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree8', x: 14, y: 25, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree9', x: 31, y: 25, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree10', x: 2, y: 35, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree11', x: 14, y: 35, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree12', x: 31, y: 35, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree13', x: 8, y: 5, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'tree14', x: 20, y: 5, type: 'wood', respawnMs: 30_000, yieldAmount: 2 },
-  { id: 'rock1', x: 20, y: 15, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock2', x: 37, y: 5, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock3', x: 25, y: 15, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock4', x: 37, y: 15, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock5', x: 8, y: 25, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock6', x: 20, y: 25, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock7', x: 25, y: 25, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock8', x: 37, y: 25, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock9', x: 8, y: 35, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock10', x: 20, y: 35, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock11', x: 25, y: 35, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock12', x: 37, y: 35, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock13', x: 24, y: 6, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock14', x: 6, y: 24, type: 'stone', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'tree1', x: 2, y: 5, type: 'wood', respawnMs: 180_000, yieldAmount: 2 },
+  { id: 'tree2', x: 14, y: 5, type: 'wood', respawnMs: 180_000, yieldAmount: 2 },
+  { id: 'tree3', x: 31, y: 5, type: 'wood', respawnMs: 180_000, yieldAmount: 2 },
+  { id: 'tree4', x: 2, y: 15, type: 'wood', respawnMs: 180_000, yieldAmount: 2 },
+  { id: 'tree5', x: 14, y: 15, type: 'wood', respawnMs: 180_000, yieldAmount: 2 },
+  { id: 'tree6', x: 31, y: 15, type: 'wood', respawnMs: 180_000, yieldAmount: 2 },
+  { id: 'tree7', x: 2, y: 25, type: 'wood', respawnMs: 180_000, yieldAmount: 2 },
+  { id: 'tree8', x: 14, y: 25, type: 'wood', respawnMs: 180_000, yieldAmount: 2 },
+  { id: 'tree9', x: 31, y: 25, type: 'wood', respawnMs: 180_000, yieldAmount: 2 },
+  { id: 'tree10', x: 2, y: 38, type: 'wood', respawnMs: 180_000, yieldAmount: 2 },
+  { id: 'tree11', x: 14, y: 35, type: 'wood', respawnMs: 180_000, yieldAmount: 2 },
+  { id: 'tree12', x: 31, y: 38, type: 'wood', respawnMs: 180_000, yieldAmount: 2 },
+  { id: 'tree13', x: 8, y: 5, type: 'wood', respawnMs: 180_000, yieldAmount: 2 },
+  { id: 'tree14', x: 20, y: 5, type: 'wood', respawnMs: 180_000, yieldAmount: 2 },
+  { id: 'rock1', x: 20, y: 15, type: 'stone', respawnMs: 300_000, yieldAmount: 1 },
+  { id: 'rock2', x: 37, y: 5, type: 'stone', respawnMs: 300_000, yieldAmount: 1 },
+  { id: 'rock3', x: 25, y: 15, type: 'stone', respawnMs: 300_000, yieldAmount: 1 },
+  { id: 'rock4', x: 37, y: 15, type: 'stone', respawnMs: 300_000, yieldAmount: 1 },
+  { id: 'rock5', x: 8, y: 25, type: 'stone', respawnMs: 300_000, yieldAmount: 1 },
+  { id: 'rock6', x: 20, y: 25, type: 'stone', respawnMs: 300_000, yieldAmount: 1 },
+  { id: 'rock7', x: 25, y: 25, type: 'stone', respawnMs: 300_000, yieldAmount: 1 },
+  { id: 'rock8', x: 37, y: 25, type: 'stone', respawnMs: 300_000, yieldAmount: 1 },
+  { id: 'rock9', x: 8, y: 35, type: 'stone', respawnMs: 300_000, yieldAmount: 1 },
+  { id: 'rock10', x: 20, y: 35, type: 'stone', respawnMs: 300_000, yieldAmount: 1 },
+  { id: 'rock11', x: 25, y: 38, type: 'stone', respawnMs: 300_000, yieldAmount: 1 },
+  { id: 'rock12', x: 37, y: 35, type: 'stone', respawnMs: 300_000, yieldAmount: 1 },
+  { id: 'rock13', x: 24, y: 6, type: 'stone', respawnMs: 300_000, yieldAmount: 1 },
+  { id: 'rock14', x: 6, y: 24, type: 'stone', respawnMs: 300_000, yieldAmount: 1 },
 ];
 
 export const SHOP_LOCATION = { x: 16, y: 12, size: 2 };
@@ -144,9 +147,9 @@ export interface CropConfig {
 }
 
 export const CROPS: Record<string, CropConfig> = {
-  wheat: { id: 'wheat', name: 'Wheat', icon: '🌾', growTimeMs: 30_000, yieldAmount: 3 },
-  corn: { id: 'corn', name: 'Corn', icon: '🌽', growTimeMs: 60_000, yieldAmount: 4 },
-  potato: { id: 'potato', name: 'Potato', icon: '🥔', growTimeMs: 90_000, yieldAmount: 6 },
+  wheat: { id: 'wheat', name: 'Wheat', icon: '🌾', growTimeMs: 300_000, yieldAmount: 3 },
+  corn: { id: 'corn', name: 'Corn', icon: '🌽', growTimeMs: 600_000, yieldAmount: 4 },
+  potato: { id: 'potato', name: 'Potato', icon: '🥔', growTimeMs: 900_000, yieldAmount: 6 },
 };
 
 // ---------- Buildings (placed on your own plot) ----------
@@ -198,33 +201,36 @@ export interface CraftRecipeConfig {
   category: 'food' | 'goods';
   inputs: Record<string, number>;
   outputQty: number;
+  craftTimeMs: number;
 }
 
 export const CRAFT_RECIPES: Record<string, CraftRecipeConfig> = {
-  // --- Tier 1: one resource type, quick and simple ---
-  tools: { id: 'tools', name: 'Tools', icon: '🛠️', category: 'goods', inputs: { wood: 3, stone: 2 }, outputQty: 1 },
-  bread: { id: 'bread', name: 'Bread', icon: '🍞', category: 'food', inputs: { wheat: 3 }, outputQty: 2 },
-  furniture: { id: 'furniture', name: 'Furniture', icon: '🪑', category: 'goods', inputs: { wood: 6 }, outputQty: 1 },
-  cheese: { id: 'cheese', name: 'Cheese', icon: '🧀', category: 'food', inputs: { milk: 2 }, outputQty: 1 },
-  yarn: { id: 'yarn', name: 'Yarn', icon: '🧵', category: 'goods', inputs: { wool: 2 }, outputQty: 1 },
-  omelette: { id: 'omelette', name: 'Omelette', icon: '🍳', category: 'food', inputs: { egg: 2 }, outputQty: 1 },
-  cornbread: { id: 'cornbread', name: 'Cornbread', icon: '🌽', category: 'food', inputs: { corn: 3 }, outputQty: 2 },
-  fries: { id: 'fries', name: 'Fries', icon: '🍟', category: 'food', inputs: { potato: 3 }, outputQty: 2 },
+  // --- Tier 1: one resource type ---
+  tools: { id: 'tools', name: 'Tools', icon: '🛠️', category: 'goods', inputs: { wood: 3, stone: 2 }, outputQty: 1, craftTimeMs: 180_000 },
+  bread: { id: 'bread', name: 'Bread', icon: '🍞', category: 'food', inputs: { wheat: 3 }, outputQty: 2, craftTimeMs: 60_000 },
+  furniture: { id: 'furniture', name: 'Furniture', icon: '🪑', category: 'goods', inputs: { wood: 6 }, outputQty: 1, craftTimeMs: 240_000 },
+  cheese: { id: 'cheese', name: 'Cheese', icon: '🧀', category: 'food', inputs: { milk: 2 }, outputQty: 1, craftTimeMs: 60_000 },
+  yarn: { id: 'yarn', name: 'Yarn', icon: '🧵', category: 'goods', inputs: { wool: 2 }, outputQty: 1, craftTimeMs: 60_000 },
+  omelette: { id: 'omelette', name: 'Omelette', icon: '🍳', category: 'food', inputs: { egg: 2 }, outputQty: 1, craftTimeMs: 60_000 },
+  cornbread: { id: 'cornbread', name: 'Cornbread', icon: '🌽', category: 'food', inputs: { corn: 3 }, outputQty: 2, craftTimeMs: 90_000 },
+  fries: { id: 'fries', name: 'Fries', icon: '🍟', category: 'food', inputs: { potato: 3 }, outputQty: 2, craftTimeMs: 90_000 },
 
   // --- Tier 2: multiple different materials — worth trading for ---
-  wagonWheel: { id: 'wagonWheel', name: 'Wagon Wheel', icon: '🛞', category: 'goods', inputs: { wood: 4, stone: 3 }, outputQty: 1 },
-  toolbox: { id: 'toolbox', name: 'Toolbox', icon: '🧰', category: 'goods', inputs: { tools: 2, furniture: 1 }, outputQty: 1 },
-  feast: { id: 'feast', name: 'Feast', icon: '🍲', category: 'food', inputs: { bread: 2, cheese: 1, omelette: 1 }, outputQty: 1 },
+  wagonWheel: { id: 'wagonWheel', name: 'Wagon Wheel', icon: '🛞', category: 'goods', inputs: { wood: 4, stone: 3 }, outputQty: 1, craftTimeMs: 300_000 },
+  toolbox: { id: 'toolbox', name: 'Toolbox', icon: '🧰', category: 'goods', inputs: { tools: 2, furniture: 1 }, outputQty: 1, craftTimeMs: 480_000 },
+  feast: { id: 'feast', name: 'Feast', icon: '🍲', category: 'food', inputs: { bread: 2, cheese: 1, omelette: 1 }, outputQty: 1, craftTimeMs: 180_000 },
 };
 
 // ---------- General Store ----------
-// Crafted goods sell for real money; raw crops can be sold too but only
-// for a token 1 coin each — crafting is still the actual point of farming.
+// Base prices before supply/demand adjustment. Crafted goods sell for
+// real money; raw crops too but only 1 coin each. Tools/Furniture/Wagon
+// Wheel/Toolbox were previously too cheap to make and sold for too much —
+// lowered now that crafting actually costs real time.
 
 export const SELL_PRICES: Record<string, number> = {
-  tools: 4,
+  tools: 2,
   bread: 1,
-  furniture: 2,
+  furniture: 1,
   cheese: 2,
   yarn: 1,
   omelette: 1,
@@ -233,7 +239,15 @@ export const SELL_PRICES: Record<string, number> = {
   wheat: 1,
   corn: 1,
   potato: 1,
-  wagonWheel: 7,
-  toolbox: 15,
+  wagonWheel: 3,
+  toolbox: 6,
   feast: 12,
 };
+
+// ---------- Supply and demand ----------
+// Every unit sold nudges that item's price down; it recovers back toward
+// base price over real time if nobody's selling it. Keeps one player from
+// crashing the market by dumping everything they made.
+
+export const DEMAND_STEP = 3; // price drops 1 coin per this many units sold
+export const DEMAND_RECOVERY_MS = 120_000; // 1 unit of "sold pressure" recovers every 2 min

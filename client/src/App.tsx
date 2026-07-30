@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import {
   API_BASE, WorldConfig, GameState, PlotConfig,
   login, loginWithDiscord, getWorld, getState,
   move, gather, claimPlot, nameFarm, buildBuilding, plantCrop, harvestCrop,
-  sellToShop, craftItem, buyLivestock, collectLivestock,
+  sellToShop, craftItem, collectCraft, buyLivestock, collectLivestock,
 } from './api';
 import { authenticateWithDiscord, isInsideDiscord } from './discord';
 import { TradeInvitePrompt, TradeModal, TradeSessionState } from './TradeModal';
@@ -47,7 +47,8 @@ function isLivestockReady(animal: { type: string; lastCollectedAt: number }, wor
   return Date.now() - animal.lastCollectedAt >= cfg.produceTimeMs;
 }
 
-const CELL_PX = 13;
+const MIN_CELL_PX = 6;
+const DEFAULT_CELL_PX = 13;
 
 export default function App() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('owf_token'));
@@ -69,6 +70,8 @@ export default function App() {
   const [tradeMessage, setTradeMessage] = useState<string | null>(null);
   const [pendingInviteTo, setPendingInviteTo] = useState<string | null>(null);
   const [craftCategory, setCraftCategory] = useState<'food' | 'goods'>('food');
+  const mapWrapperRef = useRef<HTMLDivElement>(null);
+  const [cellPx, setCellPx] = useState(DEFAULT_CELL_PX);
   const [claimConfirmPlot, setClaimConfirmPlot] = useState<PlotConfig | null>(null);
 
   useEffect(() => {
@@ -88,6 +91,28 @@ export default function App() {
   useEffect(() => {
     getWorld().then(setWorld).catch((e) => showError(e.message));
   }, []);
+
+  useEffect(() => {
+    if (!world) return;
+    const el = mapWrapperRef.current;
+    if (!el) return;
+    function compute() {
+      if (!el || !world) return;
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      if (w <= 0 || h <= 0) return;
+      const size = Math.floor(Math.min(w / world.mapW, h / world.mapH));
+      setCellPx(Math.max(MIN_CELL_PX, size));
+    }
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(el);
+    window.addEventListener('resize', compute);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', compute);
+    };
+  }, [world]);
 
   useEffect(() => {
     if (!token) return;
@@ -249,12 +274,23 @@ export default function App() {
 
   const handleSell = useCallback((item: string, qty: number) => {
     if (!token) return;
-    sellToShop(token, item, qty).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => showError(e.message));
+    sellToShop(token, item, qty)
+      .then((r) => setState((p) => (p ? { ...p, inventory: r.inventory, shopPrices: r.shopPrices } : p)))
+      .catch((e) => showError(e.message));
   }, [token]);
 
   const handleCraft = useCallback((recipeId: string) => {
     if (!token) return;
-    craftItem(token, recipeId).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => showError(e.message));
+    craftItem(token, recipeId)
+      .then((r) => setState((p) => (p ? { ...p, inventory: r.inventory, craftJob: r.craftJob } : p)))
+      .catch((e) => showError(e.message));
+  }, [token]);
+
+  const handleCollectCraft = useCallback(() => {
+    if (!token) return;
+    collectCraft(token)
+      .then((r) => setState((p) => (p ? { ...p, inventory: r.inventory, craftJob: r.craftJob } : p)))
+      .catch((e) => showError(e.message));
   }, [token]);
 
   const handleNameFarm = useCallback((plotId: string, name: string) => {
@@ -355,10 +391,10 @@ export default function App() {
       )}
 
       <div className="game-layout">
-        <div className="map-wrapper">
+        <div className="map-wrapper" ref={mapWrapperRef}>
           <div
             className="map-grid"
-            style={{ gridTemplateColumns: `repeat(${world.mapW}, ${CELL_PX}px)`, gridTemplateRows: `repeat(${world.mapH}, ${CELL_PX}px)` }}
+            style={{ gridTemplateColumns: `repeat(${world.mapW}, ${cellPx}px)`, gridTemplateRows: `repeat(${world.mapH}, ${cellPx}px)` }}
           >
             {world.terrain.map((row, y) =>
               row.map((terrain, x) => {
@@ -383,7 +419,8 @@ export default function App() {
                 ].filter(Boolean).join(' ');
 
                 let content: string | null = null;
-                if (isShopTile && x === world.shopLocation.x && y === world.shopLocation.y) content = '🏪';
+                const showShopIcon = isShopTile && x === world.shopLocation.x && y === world.shopLocation.y;
+                if (showShopIcon) content = '🏪';
                 else if (building) content = world.buildings[building.type]?.icon ?? '🏗️';
                 else if (animal) content = world.livestock[animal.type]?.icon ?? '🐾';
                 else if (crop) content = world.crops[crop.cropType]?.icon ?? '🌱';
@@ -393,7 +430,18 @@ export default function App() {
 
                 return (
                   <div key={`${x},${y}`} className={cls} title={`${x},${y}`}>
-                    {content && <span className="cell-icon">{content}</span>}
+                    {content && (
+                      showShopIcon ? (
+                        <span
+                          className="cell-icon cell-icon-shop"
+                          style={{ transform: `translate(${(world.shopLocation.size - 1) * cellPx / 2}px, ${(world.shopLocation.size - 1) * cellPx / 2}px)` }}
+                        >
+                          {content}
+                        </span>
+                      ) : (
+                        <span className="cell-icon">{content}</span>
+                      )
+                    )}
                     {playersHere.map((p) => (
                       <span key={p.id} className={`avatar ${p.id === me.id ? 'avatar-me' : ''}`} title={p.username}>
                         {p.id === me.id ? '🤠' : '🧑\u200d🌾'}
@@ -491,6 +539,19 @@ export default function App() {
           )}
 
           <h4>🔨 Craft</h4>
+          {state.craftJob && (() => {
+            const recipe = world.craftRecipes[state.craftJob.recipeId];
+            const ready = Date.now() - state.craftJob.startedAt >= recipe.craftTimeMs;
+            return ready ? (
+              <button className="crop-option" onClick={handleCollectCraft}>
+                {recipe.icon} Collect {recipe.name} ({recipe.outputQty}x)
+              </button>
+            ) : (
+              <p className="modal-note">
+                {recipe.icon} Crafting {recipe.name}… ready in {Math.max(0, Math.ceil((recipe.craftTimeMs - (Date.now() - state.craftJob.startedAt)) / 1000))}s
+              </p>
+            );
+          })()}
           <div className="craft-tabs">
             <button
               className={`craft-tab ${craftCategory === 'food' ? 'craft-tab-active' : ''}`}
@@ -513,9 +574,9 @@ export default function App() {
             }))
             .sort((a, b) => (a.affordable === b.affordable ? 0 : a.affordable ? -1 : 1))
             .map(({ r, affordable }) => (
-              <button key={r.id} className="crop-option" disabled={!affordable} onClick={() => handleCraft(r.id)}>
-                {r.icon} {r.name} — needs {Object.entries(r.inputs).map(([i, q]) => `${q} ${i}`).join(', ')} → {r.outputQty}x
-                {world.sellPrices[r.id] && ` (sells for ${world.sellPrices[r.id]})`}
+              <button key={r.id} className="crop-option" disabled={!affordable || !!state.craftJob} onClick={() => handleCraft(r.id)}>
+                {r.icon} {r.name} — needs {Object.entries(r.inputs).map(([i, q]) => `${q} ${i}`).join(', ')} → {r.outputQty}x, takes {Math.round(r.craftTimeMs / 1000)}s
+                {state.shopPrices[r.id] && ` (sells for ${state.shopPrices[r.id]})`}
               </button>
             ))}
 
@@ -552,15 +613,15 @@ export default function App() {
           {nearShop && (
             <>
               <h4>🏪 General Store</h4>
-              <p className="modal-note">Sell crafted goods for coins.</p>
-              {Object.entries(world.sellPrices)
+              <p className="modal-note">Sell crafted goods for coins. Prices dip the more you dump at once, and recover over time.</p>
+              {Object.entries(state.shopPrices)
                 .filter(([item]) => (state.inventory[item] ?? 0) > 0)
                 .map(([item, price]) => (
                   <button key={item} className="sell-option" onClick={() => handleSell(item, state.inventory[item])}>
-                    <ItemIcon item={item} /> Sell all {item} ({state.inventory[item]}) for {price * state.inventory[item]} <ItemIcon item="coin" />
+                    <ItemIcon item={item} /> Sell all {item} ({state.inventory[item]}) for {price * state.inventory[item]} <ItemIcon item="coin" /> ({price} ea)
                   </button>
                 ))}
-              {Object.entries(world.sellPrices).every(([item]) => (state.inventory[item] ?? 0) === 0) && (
+              {Object.entries(state.shopPrices).every(([item]) => (state.inventory[item] ?? 0) === 0) && (
                 <p className="modal-note">You don't have any crafted goods to sell right now.</p>
               )}
             </>

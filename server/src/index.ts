@@ -15,6 +15,7 @@ import {
   CROPS, BUILDINGS, LIVESTOCK, STARTING_INVENTORY,
   SHOP_LOCATION, SELL_PRICES, CRAFT_RECIPES,
   HOMESTEAD_TIERS, MAX_HOMESTEADS_PER_PLAYER,
+  DEMAND_STEP, DEMAND_RECOVERY_MS,
 } from './world';
 import { PlayerRow, CropRow, BuildingRow } from './types';
 
@@ -147,6 +148,52 @@ function tileOccupied(x: number, y: number): boolean {
   );
 }
 
+// ---------- supply and demand pricing ----------
+// sold_units decays back toward 0 over real time; the more of an item
+// sitting in "recently sold" pressure, the lower its price.
+
+function decayedSoldUnits(item: string, now: number): number {
+  const row = db.prepare('SELECT sold_units, last_update FROM market_state WHERE item = ?').get(item) as
+    { sold_units: number; last_update: number } | undefined;
+  if (!row) return 0;
+  const elapsed = now - row.last_update;
+  const recovered = elapsed / DEMAND_RECOVERY_MS;
+  return Math.max(0, row.sold_units - recovered);
+}
+
+function currentPrice(item: string): number {
+  const base = SELL_PRICES[item];
+  if (!base) return 0;
+  const sold = decayedSoldUnits(item, Date.now());
+  return Math.max(1, base - Math.floor(sold / DEMAND_STEP));
+}
+
+function allCurrentPrices(): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const item of Object.keys(SELL_PRICES)) out[item] = currentPrice(item);
+  return out;
+}
+
+function recordSale(item: string, qty: number) {
+  const now = Date.now();
+  const sold = decayedSoldUnits(item, now) + qty;
+  db.prepare(`
+    INSERT INTO market_state (item, sold_units, last_update) VALUES (?, ?, ?)
+    ON CONFLICT(item) DO UPDATE SET sold_units = excluded.sold_units, last_update = excluded.last_update
+  `).run(item, sold, now);
+}
+
+// ---------- crafting job state ----------
+
+interface CraftingJobRow { player_id: string; recipe_id: string; started_at: number }
+function currentCraftJob(playerId: string) {
+  const row = db.prepare('SELECT * FROM crafting_jobs WHERE player_id = ?').get(playerId) as CraftingJobRow | undefined;
+  if (!row) return null;
+  const cfg = CRAFT_RECIPES[row.recipe_id];
+  const ready = !!cfg && Date.now() - row.started_at >= cfg.craftTimeMs;
+  return { recipeId: row.recipe_id, startedAt: row.started_at, ready };
+}
+
 // ---------- auth ----------
 
 app.post('/api/login', (req: Request, res: Response) => {
@@ -266,6 +313,8 @@ app.get('/api/state', authMiddleware, (req: Request, res: Response) => {
     crops: allCrops(),
     livestock: allLivestock(),
     resourceNodes: resourceNodeStates(),
+    craftJob: currentCraftJob(player.id),
+    shopPrices: allCurrentPrices(),
   });
 });
 
@@ -476,14 +525,38 @@ app.post('/api/craft', authMiddleware, (req: Request, res: Response) => {
   const recipe = CRAFT_RECIPES[recipeId];
   if (!recipe) return res.status(400).json({ error: 'unknown recipe' });
 
+  const existingJob = db.prepare('SELECT 1 FROM crafting_jobs WHERE player_id = ?').get(player.id);
+  if (existingJob) return res.status(400).json({ error: 'you already have something crafting — collect it first' });
+
   const inv = getInventory(player.id);
   for (const [item, qty] of Object.entries(recipe.inputs)) {
     if ((inv[item] ?? 0) < qty) return res.status(400).json({ error: `not enough ${item}` });
   }
-  for (const [item, qty] of Object.entries(recipe.inputs)) removeItem(player.id, item, qty);
-  addItem(player.id, recipe.id, recipe.outputQty);
 
-  res.json({ inventory: getInventory(player.id) });
+  const tx = db.transaction(() => {
+    for (const [item, qty] of Object.entries(recipe.inputs)) removeItem(player.id, item, qty);
+    db.prepare('INSERT INTO crafting_jobs (player_id, recipe_id, started_at) VALUES (?, ?, ?)').run(player.id, recipeId, Date.now());
+  });
+  tx();
+
+  res.json({ inventory: getInventory(player.id), craftJob: currentCraftJob(player.id) });
+});
+
+app.post('/api/craft/collect', authMiddleware, (req: Request, res: Response) => {
+  const player = (req as any).player as PlayerRow;
+  const job = db.prepare('SELECT * FROM crafting_jobs WHERE player_id = ?').get(player.id) as CraftingJobRow | undefined;
+  if (!job) return res.status(400).json({ error: 'nothing is crafting' });
+
+  const recipe = CRAFT_RECIPES[job.recipe_id];
+  if (!recipe || Date.now() - job.started_at < recipe.craftTimeMs) return res.status(400).json({ error: 'not ready yet' });
+
+  const tx = db.transaction(() => {
+    addItem(player.id, recipe.id, recipe.outputQty);
+    db.prepare('DELETE FROM crafting_jobs WHERE player_id = ?').run(player.id);
+  });
+  tx();
+
+  res.json({ inventory: getInventory(player.id), craftJob: null });
 });
 
 // ---------- general store ----------
@@ -491,15 +564,16 @@ app.post('/api/craft', authMiddleware, (req: Request, res: Response) => {
 app.post('/api/shop/sell', authMiddleware, (req: Request, res: Response) => {
   const player = (req as any).player as PlayerRow;
   const { item, qty } = req.body ?? {};
-  const price = SELL_PRICES[item];
-  if (!price || typeof qty !== 'number' || qty <= 0) return res.status(400).json({ error: 'invalid item or quantity' });
+  if (!SELL_PRICES[item] || typeof qty !== 'number' || qty <= 0) return res.status(400).json({ error: 'invalid item or quantity' });
   if (distToRect(player.x, player.y, SHOP_LOCATION.x, SHOP_LOCATION.y, SHOP_LOCATION.size) > 1) return res.status(400).json({ error: 'not near the store' });
 
+  const price = currentPrice(item);
   const ok = removeItem(player.id, item, qty);
   if (!ok) return res.status(400).json({ error: `not enough ${item}` });
   addItem(player.id, 'coin', price * qty);
+  recordSale(item, qty);
 
-  res.json({ inventory: getInventory(player.id) });
+  res.json({ inventory: getInventory(player.id), shopPrices: allCurrentPrices() });
 });
 
 // ---------- live barter trading ----------

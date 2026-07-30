@@ -67,6 +67,7 @@ export interface CraftRecipeConfig {
   category: 'food' | 'goods';
   inputs: Record<string, number>;
   outputQty: number;
+  craftTimeMs: number;
 }
 
 export interface WorldConfig {
@@ -114,6 +115,12 @@ export interface PlotOwners {
   [plotId: string]: { ownerId: string; username: string; farmName: string | null };
 }
 
+export interface CraftJob {
+  recipeId: string;
+  startedAt: number;
+  ready: boolean;
+}
+
 export interface GameState {
   player: Player;
   inventory: Record<string, number>;
@@ -123,6 +130,8 @@ export interface GameState {
   crops: CropInstance[];
   livestock: LivestockInstance[];
   resourceNodes: ResourceNodeState[];
+  craftJob: CraftJob | null;
+  shopPrices: Record<string, number>;
 }
 
 async function handle(res: Response) {
@@ -172,5 +181,6 @@ export const plantCrop = (token: string, x: number, y: number, cropType: string)
 export const harvestCrop = (token: string, x: number, y: number) => post(token, '/api/crops/harvest', { x, y });
 export const sellToShop = (token: string, item: string, qty: number) => post(token, '/api/shop/sell', { item, qty });
 export const craftItem = (token: string, recipeId: string) => post(token, '/api/craft', { recipeId });
+export const collectCraft = (token: string) => post(token, '/api/craft/collect');
 export const buyLivestock = (token: string, x: number, y: number, type: string) => post(token, '/api/livestock/buy', { x, y, type });
 export const collectLivestock = (token: string, x: number, y: number) => post(token, '/api/livestock/collect', { x, y });
