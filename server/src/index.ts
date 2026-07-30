@@ -314,6 +314,7 @@ app.get('/api/world', (req: Request, res: Response) => {
     paths: biome.paths,
     doors: biome.doors,
     homesteadsAllowed: biome.homesteadsAllowed,
+    building: biome.building ?? null,
     shopDoor: SHOP_DOOR,
     crops: CROPS,
     buildings: BUILDINGS,

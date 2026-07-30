@@ -81,6 +81,14 @@ export interface CraftRecipeConfig {
   craftTimeMs: number;
 }
 
+export interface BuildingFootprint {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  icon: string;
+}
+
 export interface WorldConfig {
   biomeId: string;
   biomeName: string;
@@ -92,6 +100,7 @@ export interface WorldConfig {
   paths: { x: number; y: number }[];
   doors: Partial<Record<Direction, string>>;
   homesteadsAllowed: boolean;
+  building: BuildingFootprint | null;
   shopDoor: { x: number; y: number };
   crops: Record<string, CropConfig>;
   buildings: Record<string, BuildingConfig>;

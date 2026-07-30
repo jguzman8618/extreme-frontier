@@ -165,13 +165,14 @@ body {
   justify-content: center;
 }
 .cell-grass { background: #4a5c2a; }
-.cell-water { background: #2a4a5c; }
+.cell-water { background: #2a4a5c; border-radius: 40%; }
 .cell-plot-unclaimed { background: #6b5a3a; outline: 1px dashed #d8c4a0; outline-offset: -2px; }
 .cell-plot-mine { background: #7a5a2e; }
 .cell-plot-other { background: #5a3a3a; }
 .cell-path { background: #6b5638; }
 .cell-door { background: #7a5a2e; outline: 2px solid #f4d35e; outline-offset: -2px; }
 .cell-shop-counter { background: #4a3a5c; }
+.cell-shop-building { background: #6b4a35; border: 1px solid #4a3324; }
 
 .cell-icon { font-size: 9px; line-height: 1; pointer-events: none; }
 .cell-icon-shop { font-size: 22px; line-height: 1; pointer-events: none; z-index: 2; }

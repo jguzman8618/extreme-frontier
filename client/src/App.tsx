@@ -453,12 +453,16 @@ export default function App() {
                   return pos.x === x && pos.y === y;
                 });
                 const isShopCounter = world.biomeId === 'shop' && x === world.shopDoor.x && y === world.shopDoor.y;
+                const isShopBuildingTile = !!world.building &&
+                  x >= world.building.x && x < world.building.x + world.building.w &&
+                  y >= world.building.y && y < world.building.y + world.building.h;
                 const playersHere = state.players.filter((p) => p.x === x && p.y === y);
 
                 const cls = [
                   'cell',
                   terrain === 'water' && 'cell-water',
-                  terrain === 'grass' && !plot && !isPath && !isDoorTile && 'cell-grass',
+                  terrain === 'grass' && !plot && !isPath && !isDoorTile && !isShopBuildingTile && 'cell-grass',
+                  isShopBuildingTile && 'cell-shop-building',
                   isPath && 'cell-path',
                   isDoorTile && 'cell-door',
                   isShopCounter && 'cell-shop-counter',
@@ -469,7 +473,7 @@ export default function App() {
 
                 let content: string | null = null;
                 if (isDoorTile) content = '🚪';
-                else if (isShopCounter) content = '🏪';
+                else if (isShopCounter) content = world.building?.icon ?? '🏪';
                 else if (decoration) content = decoration.icon;
                 else if (building) content = world.buildings[building.type]?.icon ?? '🏗️';
                 else if (animal) content = world.livestock[animal.type]?.icon ?? '🐾';

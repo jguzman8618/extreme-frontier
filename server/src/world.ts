@@ -33,6 +33,14 @@ export interface DecorationConfig {
   blocking: boolean;
 }
 
+export interface BuildingFootprint {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  icon: string;
+}
+
 export interface BiomeConfig {
   id: BiomeId;
   name: string;
@@ -45,6 +53,7 @@ export interface BiomeConfig {
   paths: { x: number; y: number }[];
   doors: Partial<Record<Direction, BiomeId>>;
   homesteadsAllowed: boolean;
+  building?: BuildingFootprint;
 }
 
 const OPPOSITE: Record<Direction, Direction> = { north: 'south', south: 'north', east: 'west', west: 'east' };
@@ -67,11 +76,15 @@ export function doorPosition(biome: BiomeConfig, dir: Direction): { x: number; y
 
 const HOME_MAP_W = 40;
 const HOME_MAP_H = 40;
-const HOME_RIVER_X = [18, 19];
 const HOME_BRIDGES = [6, 24];
 
+function homeRiverCenterX(y: number): number {
+  return 18 + Math.round(1.5 * Math.sin((y / HOME_MAP_H) * Math.PI * 2));
+}
+
 function homesteadTerrainAt(x: number, y: number): Terrain {
-  const inRiver = x >= HOME_RIVER_X[0] && x <= HOME_RIVER_X[1];
+  const cx = homeRiverCenterX(y);
+  const inRiver = x === cx || x === cx + 1;
   if (inRiver && !HOME_BRIDGES.includes(y)) return 'water';
   return 'grass';
 }
@@ -110,8 +123,8 @@ export const HOMESTEAD_RESOURCE_NODES: ResourceNodeConfig[] = [
   { id: 'tree11', x: 14, y: 35, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
   { id: 'tree12', x: 31, y: 38, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
   { id: 'tree13', x: 8, y: 5, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'tree14', x: 20, y: 5, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
-  { id: 'rock1', x: 20, y: 15, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
+  { id: 'tree14', x: 16, y: 5, type: 'wood', respawnMs: 45_000, yieldAmount: 2 },
+  { id: 'rock1', x: 17, y: 15, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
   { id: 'rock2', x: 37, y: 5, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
   { id: 'rock3', x: 25, y: 15, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
   { id: 'rock4', x: 37, y: 15, type: 'stone', respawnMs: 90_000, yieldAmount: 1 },
@@ -135,14 +148,7 @@ export const HOMESTEAD_BIOME: BiomeConfig = {
   terrainAt: homesteadTerrainAt,
   plots: HOMESTEAD_PLOTS,
   resourceNodes: HOMESTEAD_RESOURCE_NODES,
-  decorations: [
-    { x: 5, y: 7, icon: '🍎', blocking: true },
-    { x: 15, y: 15, icon: '🍎', blocking: true },
-    { x: 26, y: 7, icon: '🍎', blocking: true },
-    { x: 15, y: 25, icon: '🍎', blocking: true },
-    { x: 6, y: 24, icon: '🍎', blocking: true },
-    { x: 36, y: 32, icon: '🍎', blocking: true },
-  ],
+  decorations: [],
   paths: [],
   doors: { east: 'shop' },
   homesteadsAllowed: true,
@@ -158,28 +164,33 @@ const SHOP_MAP_H = 40;
 
 // Building footprint (blocks movement) — the door itself is a separate
 // interactive tile just outside it, not part of the solid block.
-const SHOP_BUILDING = { x: 15, y: 10, w: 10, h: 10 };
-export const SHOP_DOOR = { x: 19, y: 20 }; // just south of the building
+const SHOP_BUILDING = { x: 16, y: 11, w: 7, h: 7 };
+export const SHOP_DOOR = { x: 19, y: 18 }; // just south of the building
 
 function buildShopPond(): { x: number; y: number }[] {
   const tiles: { x: number; y: number }[] = [];
-  for (let x = 28; x <= 34; x++) {
-    for (let y = 4; y <= 9; y++) {
-      const dx = (x - 31) / 3;
-      const dy = (y - 6.5) / 2.5;
-      if (dx * dx + dy * dy <= 1) tiles.push({ x, y });
+  const cx = 31, cy = 7, r = 3;
+  for (let x = cx - r; x <= cx + r; x++) {
+    for (let y = cy - r; y <= cy + r; y++) {
+      const dx = x - cx, dy = y - cy;
+      if (dx * dx + dy * dy <= r * r + 0.5) tiles.push({ x, y });
     }
   }
   return tiles;
 }
 
 function buildShopStream(): { x: number; y: number }[] {
+  // Exits the pond's south-east edge and curves distinctly right away,
+  // rather than continuing straight down from the pond's center.
   const tiles: { x: number; y: number }[] = [];
-  let sx = 31, sy = 10;
-  for (let i = 0; i < 20; i++) {
-    tiles.push({ x: sx, y: sy });
-    sy += 1;
-    if (i % 3 === 0) sx += i % 6 === 0 ? 1 : -1;
+  let x = 34, y = 9;
+  const moves: [number, number][] = [
+    [1, 1], [1, 1], [0, 1], [-1, 1], [-1, 1], [0, 1],
+    [1, 1], [1, 1], [0, 1], [-1, 1], [-1, 1], [0, 1], [1, 1], [0, 1],
+  ];
+  for (const [dx, dy] of moves) {
+    x += dx; y += dy;
+    tiles.push({ x, y });
   }
   return tiles;
 }
@@ -194,7 +205,7 @@ function shopTerrainAt(x: number, y: number): Terrain {
 function buildShopDecorations(): DecorationConfig[] {
   const deco: DecorationConfig[] = [];
   // Scenery around the pond, plus a windmill landmark.
-  const trees = [[27, 5], [35, 5], [27, 10], [35, 10]];
+  const trees = [[27, 5], [35, 5], [27, 10], [37, 10]];
   const rocks = [[29, 3], [33, 11]];
   for (const [x, y] of trees) deco.push({ x, y, icon: '🌳', blocking: true });
   for (const [x, y] of rocks) deco.push({ x, y, icon: '🪨', blocking: true });
@@ -236,6 +247,7 @@ export const SHOP_BIOME: BiomeConfig = {
   paths: buildShopPaths(),
   doors: { west: 'homestead' },
   homesteadsAllowed: false,
+  building: { ...SHOP_BUILDING, icon: '🏪' },
 };
 
 export const BIOMES: Record<BiomeId, BiomeConfig> = {
