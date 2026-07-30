@@ -13,7 +13,7 @@ import {
   plotAt, plotCenter, isWalkable, randomFreeResourceSpot,
   CROPS, BUILDINGS, LIVESTOCK, STARTING_INVENTORY,
   SELL_PRICES, CRAFT_RECIPES, DEMAND_STEP, DEMAND_RECOVERY_MS,
-  HOMESTEAD_TIERS, MAX_HOMESTEADS_PER_PLAYER, SHOP_DOOR, MATERIAL_ICONS,
+  HOMESTEAD_TIERS, MAX_HOMESTEADS_PER_PLAYER, SHOP_DOOR, MATERIAL_ICONS, HOMESTEAD_SELL_REFUND_RATE,
   PlotConfig,
 } from './world';
 import { PlayerRow, CropRow, BuildingRow } from './types';
@@ -351,6 +351,7 @@ app.get('/api/world', (req: Request, res: Response) => {
     craftRecipes: CRAFT_RECIPES,
     homesteadTiers: HOMESTEAD_TIERS,
     maxHomesteads: MAX_HOMESTEADS_PER_PLAYER,
+    homesteadSellRefundRate: HOMESTEAD_SELL_REFUND_RATE,
     materialIcons: MATERIAL_ICONS,
   });
 });
@@ -472,6 +473,33 @@ app.post('/api/plots/:plotId/claim', authMiddleware, (req: Request, res: Respons
   res.json({ ok: true, inventory: getInventory(player.id) });
 });
 
+app.post('/api/plots/:plotId/sell', authMiddleware, (req: Request, res: Response) => {
+  const player = (req as any).player as PlayerRow;
+  const found = findPlotById(req.params.plotId);
+  if (!found) return res.status(400).json({ error: 'unknown plot' });
+  const { plot, biome } = found;
+
+  const owner = db.prepare('SELECT owner_id FROM plot_owners WHERE plot_id = ?').get(plot.id) as { owner_id: string } | undefined;
+  if (!owner || owner.owner_id !== player.id) return res.status(403).json({ error: 'not your plot' });
+
+  const tier = HOMESTEAD_TIERS[plot.size];
+  const refund = Math.floor(tier.cost * HOMESTEAD_SELL_REFUND_RATE);
+
+  const tx = db.transaction(() => {
+    db.prepare('DELETE FROM buildings WHERE biome = ? AND plot_id = ?').run(biome, plot.id);
+    db.prepare('DELETE FROM livestock WHERE biome = ? AND plot_id = ?').run(biome, plot.id);
+    db.prepare('DELETE FROM crops WHERE biome = ? AND x >= ? AND x < ? AND y >= ? AND y < ?')
+      .run(biome, plot.x, plot.x + plot.size, plot.y, plot.y + plot.size);
+    db.prepare('DELETE FROM plot_owners WHERE plot_id = ?').run(plot.id);
+    addItem(player.id, 'coin', refund);
+  });
+  tx();
+
+  io.emit('plotUpdate', { plotId: plot.id, removed: true });
+  io.emit('plotCleared', { biome, plotId: plot.id, x: plot.x, y: plot.y, size: plot.size });
+  res.json({ ok: true, refund, inventory: getInventory(player.id) });
+});
+
 app.post('/api/plots/:plotId/name', authMiddleware, (req: Request, res: Response) => {
   const player = (req as any).player as PlayerRow;
   const found = findPlotById(req.params.plotId);
@@ -542,9 +570,12 @@ app.post('/api/crops/plant', authMiddleware, (req: Request, res: Response) => {
   if (!hasBuilding(biome, plot.id, 'shed')) return res.status(400).json({ error: 'build a Shed to farm crops' });
   if (tileOccupied(biome, x, y)) return res.status(400).json({ error: 'tile already in use' });
 
+  const paid = removeItem(player.id, 'coin', cfg.plantCost);
+  if (!paid) return res.status(400).json({ error: `not enough coins (need ${cfg.plantCost} to plant ${cfg.name})` });
+
   db.prepare('INSERT INTO crops (biome, x, y, owner_id, crop_type, planted_at) VALUES (?, ?, ?, ?, ?, ?)').run(biome, x, y, player.id, cropType, Date.now());
   io.emit('cropUpdate', { x, y, ownerId: player.id, cropType, plantedAt: Date.now(), removed: false });
-  res.json({ ok: true });
+  res.json({ ok: true, inventory: getInventory(player.id) });
 });
 
 app.post('/api/crops/harvest', authMiddleware, (req: Request, res: Response) => {

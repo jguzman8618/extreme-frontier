@@ -110,6 +110,7 @@ export const HOMESTEAD_TIERS: Record<number, { label: string; cost: number }> = 
   7: { label: 'Large', cost: 5000 },
 };
 export const MAX_HOMESTEADS_PER_PLAYER = 3;
+export const HOMESTEAD_SELL_REFUND_RATE = 0.5;
 
 export const HOMESTEAD_RESOURCE_NODES: ResourceNodeConfig[] = [
   { id: 'tree1', x: 2, y: 5, type: 'wood', icon: '🌲', respawnMs: 45_000, yieldAmount: 2 },
@@ -470,18 +471,19 @@ export interface CropConfig {
   icon: string;
   growTimeMs: number;
   yieldAmount: number;
+  plantCost: number;
 }
 
 export const CROPS: Record<string, CropConfig> = {
-  wheat: { id: 'wheat', name: 'Wheat', icon: '🌾', growTimeMs: 30_000, yieldAmount: 3 },
-  corn: { id: 'corn', name: 'Corn', icon: '🌽', growTimeMs: 60_000, yieldAmount: 4 },
-  potato: { id: 'potato', name: 'Potato', icon: '🥔', growTimeMs: 90_000, yieldAmount: 6 },
-  squash: { id: 'squash', name: 'Squash', icon: '🥒', growTimeMs: 30_000, yieldAmount: 3 },
-  cranberry: { id: 'cranberry', name: 'Cranberry', icon: '🔴', growTimeMs: 60_000, yieldAmount: 4 },
-  carrot: { id: 'carrot', name: 'Carrot', icon: '🥕', growTimeMs: 30_000, yieldAmount: 3 },
-  cabbage: { id: 'cabbage', name: 'Cabbage', icon: '🥬', growTimeMs: 60_000, yieldAmount: 4 },
-  turnip: { id: 'turnip', name: 'Turnip', icon: '🫜', growTimeMs: 90_000, yieldAmount: 6 },
-  pumpkin: { id: 'pumpkin', name: 'Pumpkin', icon: '🎃', growTimeMs: 90_000, yieldAmount: 6 },
+  wheat: { id: 'wheat', name: 'Wheat', icon: '🌾', growTimeMs: 30_000, yieldAmount: 3, plantCost: 3 },
+  corn: { id: 'corn', name: 'Corn', icon: '🌽', growTimeMs: 60_000, yieldAmount: 4, plantCost: 5 },
+  potato: { id: 'potato', name: 'Potato', icon: '🥔', growTimeMs: 90_000, yieldAmount: 6, plantCost: 8 },
+  squash: { id: 'squash', name: 'Squash', icon: '🥒', growTimeMs: 30_000, yieldAmount: 3, plantCost: 3 },
+  cranberry: { id: 'cranberry', name: 'Cranberry', icon: '🔴', growTimeMs: 60_000, yieldAmount: 4, plantCost: 5 },
+  carrot: { id: 'carrot', name: 'Carrot', icon: '🥕', growTimeMs: 30_000, yieldAmount: 3, plantCost: 3 },
+  cabbage: { id: 'cabbage', name: 'Cabbage', icon: '🥬', growTimeMs: 60_000, yieldAmount: 4, plantCost: 5 },
+  turnip: { id: 'turnip', name: 'Turnip', icon: '🫜', growTimeMs: 90_000, yieldAmount: 6, plantCost: 8 },
+  pumpkin: { id: 'pumpkin', name: 'Pumpkin', icon: '🎃', growTimeMs: 90_000, yieldAmount: 6, plantCost: 8 },
 };
 
 // ---------- Buildings (placed on your own plot) ----------
@@ -530,14 +532,14 @@ export interface CraftRecipeConfig {
   id: string;
   name: string;
   icon: string;
-  category: 'food' | 'goods';
+  category: 'food' | 'feast' | 'tools' | 'goods' | 'toolbox';
   inputs: Record<string, number>;
   outputQty: number;
   craftTimeMs: number;
 }
 
 export const CRAFT_RECIPES: Record<string, CraftRecipeConfig> = {
-  tools: { id: 'tools', name: 'Tools', icon: '🛠️', category: 'goods', inputs: { wood: 3, stone: 2 }, outputQty: 1, craftTimeMs: 45_000 },
+  tools: { id: 'tools', name: 'Tools', icon: '🛠️', category: 'tools', inputs: { wood: 3, stone: 2 }, outputQty: 1, craftTimeMs: 45_000 },
   bread: { id: 'bread', name: 'Bread', icon: '🍞', category: 'food', inputs: { wheat: 3 }, outputQty: 2, craftTimeMs: 20_000 },
   furniture: { id: 'furniture', name: 'Furniture', icon: '🪑', category: 'goods', inputs: { wood: 6 }, outputQty: 1, craftTimeMs: 45_000 },
   cheese: { id: 'cheese', name: 'Cheese', icon: '🧀', category: 'food', inputs: { milk: 2 }, outputQty: 1, craftTimeMs: 20_000 },
@@ -546,24 +548,24 @@ export const CRAFT_RECIPES: Record<string, CraftRecipeConfig> = {
   cornbread: { id: 'cornbread', name: 'Cornbread', icon: '🌽', category: 'food', inputs: { corn: 3 }, outputQty: 2, craftTimeMs: 30_000 },
   fries: { id: 'fries', name: 'Fries', icon: '🍟', category: 'food', inputs: { potato: 3 }, outputQty: 2, craftTimeMs: 30_000 },
   wagonWheel: { id: 'wagonWheel', name: 'Wagon Wheel', icon: '🛞', category: 'goods', inputs: { wood: 4, stone: 3 }, outputQty: 1, craftTimeMs: 60_000 },
-  toolbox: { id: 'toolbox', name: 'Toolbox', icon: '🧰', category: 'goods', inputs: { tools: 2, furniture: 1 }, outputQty: 1, craftTimeMs: 90_000 },
-  feast: { id: 'feast', name: 'Feast', icon: '🍲', category: 'food', inputs: { bread: 2, cheese: 1, omelette: 1 }, outputQty: 1, craftTimeMs: 75_000 },
-  hardwoodTools: { id: 'hardwoodTools', name: 'Hardwood Tools', icon: '🔨', category: 'goods', inputs: { hardwood: 3, flint: 2 }, outputQty: 1, craftTimeMs: 45_000 },
+  toolbox: { id: 'toolbox', name: 'Toolbox', icon: '🧰', category: 'toolbox', inputs: { tools: 2, furniture: 1 }, outputQty: 1, craftTimeMs: 90_000 },
+  feast: { id: 'feast', name: 'Feast', icon: '🍲', category: 'feast', inputs: { bread: 2, cheese: 1, omelette: 1 }, outputQty: 1, craftTimeMs: 75_000 },
+  hardwoodTools: { id: 'hardwoodTools', name: 'Hardwood Tools', icon: '🔨', category: 'tools', inputs: { hardwood: 3, flint: 2 }, outputQty: 1, craftTimeMs: 45_000 },
   pumpkinPie: { id: 'pumpkinPie', name: 'Pumpkin Pie', icon: '🥧', category: 'food', inputs: { pumpkin: 2 }, outputQty: 1, craftTimeMs: 20_000 },
   cranberrySauce: { id: 'cranberrySauce', name: 'Cranberry Sauce', icon: '🍯', category: 'food', inputs: { cranberry: 3 }, outputQty: 2, craftTimeMs: 20_000 },
   roastedSquash: { id: 'roastedSquash', name: 'Roasted Squash', icon: '🍠', category: 'food', inputs: { squash: 2 }, outputQty: 1, craftTimeMs: 20_000 },
-  harvestFeast: { id: 'harvestFeast', name: 'Harvest Feast', icon: '🦃', category: 'food', inputs: { pumpkinPie: 1, cranberrySauce: 1, roastedSquash: 1 }, outputQty: 1, craftTimeMs: 75_000 },
+  harvestFeast: { id: 'harvestFeast', name: 'Harvest Feast', icon: '🦃', category: 'feast', inputs: { pumpkinPie: 1, cranberrySauce: 1, roastedSquash: 1 }, outputQty: 1, craftTimeMs: 75_000 },
   hardwoodFurniture: { id: 'hardwoodFurniture', name: 'Hardwood Furniture', icon: '🪵', category: 'goods', inputs: { hardwood: 6 }, outputQty: 1, craftTimeMs: 45_000 },
   flintBlade: { id: 'flintBlade', name: 'Flint Blade', icon: '🔪', category: 'goods', inputs: { flint: 4 }, outputQty: 1, craftTimeMs: 45_000 },
-  hardwoodToolbox: { id: 'hardwoodToolbox', name: 'Hardwood Toolbox', icon: '🧰', category: 'goods', inputs: { hardwoodTools: 2, hardwoodFurniture: 1 }, outputQty: 1, craftTimeMs: 90_000 },
-  pineTools: { id: 'pineTools', name: 'Pine Tools', icon: '🛠️', category: 'goods', inputs: { pine: 3, ice: 2 }, outputQty: 1, craftTimeMs: 45_000 },
+  hardwoodToolbox: { id: 'hardwoodToolbox', name: 'Hardwood Toolbox', icon: '🧰', category: 'toolbox', inputs: { hardwoodTools: 2, hardwoodFurniture: 1 }, outputQty: 1, craftTimeMs: 90_000 },
+  pineTools: { id: 'pineTools', name: 'Pine Tools', icon: '🛠️', category: 'tools', inputs: { pine: 3, ice: 2 }, outputQty: 1, craftTimeMs: 45_000 },
   pineFurniture: { id: 'pineFurniture', name: 'Pine Furniture', icon: '🪑', category: 'goods', inputs: { pine: 6 }, outputQty: 1, craftTimeMs: 45_000 },
   iceCarving: { id: 'iceCarving', name: 'Ice Carving', icon: '🗿', category: 'goods', inputs: { ice: 4 }, outputQty: 1, craftTimeMs: 45_000 },
-  pineToolbox: { id: 'pineToolbox', name: 'Pine Toolbox', icon: '🧰', category: 'goods', inputs: { pineTools: 2, pineFurniture: 1 }, outputQty: 1, craftTimeMs: 90_000 },
+  pineToolbox: { id: 'pineToolbox', name: 'Pine Toolbox', icon: '🧰', category: 'toolbox', inputs: { pineTools: 2, pineFurniture: 1 }, outputQty: 1, craftTimeMs: 90_000 },
   carrotSoup: { id: 'carrotSoup', name: 'Carrot Soup', icon: '🍲', category: 'food', inputs: { carrot: 3 }, outputQty: 2, craftTimeMs: 20_000 },
   cabbageRolls: { id: 'cabbageRolls', name: 'Cabbage Rolls', icon: '🥙', category: 'food', inputs: { cabbage: 2 }, outputQty: 1, craftTimeMs: 20_000 },
   turnipMash: { id: 'turnipMash', name: 'Turnip Mash', icon: '🍚', category: 'food', inputs: { turnip: 2 }, outputQty: 1, craftTimeMs: 20_000 },
-  wintersFeast: { id: 'wintersFeast', name: "Winter's Feast", icon: '❄️', category: 'food', inputs: { carrotSoup: 1, cabbageRolls: 1, turnipMash: 1 }, outputQty: 1, craftTimeMs: 75_000 },
+  wintersFeast: { id: 'wintersFeast', name: "Winter's Feast", icon: '❄️', category: 'feast', inputs: { carrotSoup: 1, cabbageRolls: 1, turnipMash: 1 }, outputQty: 1, craftTimeMs: 75_000 },
 };
 
 // ---------- General Store (only usable while in the Shop biome) ----------

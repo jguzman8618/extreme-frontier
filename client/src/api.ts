@@ -52,6 +52,7 @@ export interface CropConfig {
   icon: string;
   growTimeMs: number;
   yieldAmount: number;
+  plantCost: number;
 }
 
 export interface BuildingConfig {
@@ -109,6 +110,7 @@ export interface WorldConfig {
   sellPrices: Record<string, number>;
   craftRecipes: Record<string, CraftRecipeConfig>;
   homesteadTiers: Record<number, { label: string; cost: number }>;
+  homesteadSellRefundRate: number;
   materialIcons: Record<string, string>;
   maxHomesteads: number;
 }
@@ -204,6 +206,7 @@ export const move = (token: string, x: number, y: number) => post(token, '/api/m
 export const travel = (token: string, direction: Direction) => post(token, '/api/travel', { direction });
 export const gather = (token: string, nodeId: string) => post(token, '/api/gather', { nodeId });
 export const claimPlot = (token: string, plotId: string) => post(token, `/api/plots/${plotId}/claim`);
+export const sellPlot = (token: string, plotId: string) => post(token, `/api/plots/${plotId}/sell`);
 export const nameFarm = (token: string, plotId: string, name: string) => post(token, `/api/plots/${plotId}/name`, { name });
 export const buildBuilding = (token: string, x: number, y: number, type: string) => post(token, '/api/buildings', { x, y, type });
 export const plantCrop = (token: string, x: number, y: number, cropType: string) => post(token, '/api/crops/plant', { x, y, cropType });

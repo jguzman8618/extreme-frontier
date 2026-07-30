@@ -3,7 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import {
   API_BASE, WorldConfig, GameState, PlotConfig, Direction,
   login, loginWithDiscord, getWorld, getState,
-  move, travel, gather, claimPlot, nameFarm, buildBuilding, plantCrop, harvestCrop,
+  move, travel, gather, claimPlot, sellPlot, nameFarm, buildBuilding, plantCrop, harvestCrop,
   sellToShop, craftItem, collectCraft, buyLivestock, collectLivestock,
 } from './api';
 import { authenticateWithDiscord, isInsideDiscord } from './discord';
@@ -99,6 +99,7 @@ export default function App() {
   const mapWrapperRef = useRef<HTMLDivElement>(null);
   const [cellPx, setCellPx] = useState(DEFAULT_CELL_PX);
   const [claimConfirmPlot, setClaimConfirmPlot] = useState<PlotConfig | null>(null);
+  const [sellConfirmPlot, setSellConfirmPlot] = useState<PlotConfig | null>(null);
   const [pendingGatherId, setPendingGatherId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -213,8 +214,26 @@ export default function App() {
       });
     });
 
-    s.on('plotUpdate', ({ plotId, ownerId, username, farmName }: { plotId: string; ownerId: string; username: string; farmName: string | null }) => {
-      setState((prev) => (prev ? { ...prev, plotOwners: { ...prev.plotOwners, [plotId]: { ownerId, username, farmName } } } : prev));
+    s.on('plotUpdate', (d: { plotId: string; ownerId?: string; username?: string; farmName?: string | null; removed?: boolean }) => {
+      setState((prev) => {
+        if (!prev) return prev;
+        if (d.removed) {
+          const plotOwners = { ...prev.plotOwners };
+          delete plotOwners[d.plotId];
+          return { ...prev, plotOwners };
+        }
+        return { ...prev, plotOwners: { ...prev.plotOwners, [d.plotId]: { ownerId: d.ownerId!, username: d.username!, farmName: d.farmName ?? null } } };
+      });
+    });
+
+    s.on('plotCleared', (d: { biome: string; plotId: string; x: number; y: number; size: number }) => {
+      setState((prev) => {
+        if (!prev || prev.player.biome !== d.biome) return prev;
+        const buildings = prev.buildings.filter((b) => b.plot_id !== d.plotId);
+        const livestock = prev.livestock.filter((a) => !(a.x >= d.x && a.x < d.x + d.size && a.y >= d.y && a.y < d.y + d.size));
+        const crops = prev.crops.filter((c) => !(c.x >= d.x && c.x < d.x + d.size && c.y >= d.y && c.y < d.y + d.size));
+        return { ...prev, buildings, livestock, crops };
+      });
     });
 
     s.on('buildingUpdate', (b: { x: number; y: number; plotId: string; ownerId: string; type: string }) => {
@@ -344,6 +363,19 @@ export default function App() {
       });
   }, [token]);
 
+  const handleSellPlot = useCallback((plotId: string) => {
+    if (!token) return;
+    sellPlot(token, plotId)
+      .then((r) => {
+        setState((p) => (p ? { ...p, inventory: r.inventory } : p));
+        setSellConfirmPlot(null);
+      })
+      .catch((e) => {
+        showError(e.message);
+        setSellConfirmPlot(null);
+      });
+  }, [token]);
+
   const handleBuild = useCallback((x: number, y: number, type: string) => {
     if (!token) return;
     buildBuilding(token, x, y, type).then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p))).catch((e) => showError(e.message));
@@ -351,7 +383,9 @@ export default function App() {
 
   const handlePlant = useCallback((x: number, y: number, cropType: string) => {
     if (!token) return;
-    plantCrop(token, x, y, cropType).catch((e) => showError(e.message));
+    plantCrop(token, x, y, cropType)
+      .then((r) => setState((p) => (p ? { ...p, inventory: r.inventory } : p)))
+      .catch((e) => showError(e.message));
   }, [token]);
 
   const handleHarvest = useCallback((x: number, y: number) => {
@@ -623,6 +657,11 @@ export default function App() {
           {isMyPlot && !hasCabin && (
             <p className="modal-note">⚠️ Build a Cabin here first — nothing else works on this homestead without one.</p>
           )}
+          {isMyPlot && occupyingPlot && (
+            <button className="cancel" onClick={() => setSellConfirmPlot(occupyingPlot)}>
+              💰 Sell this homestead
+            </button>
+          )}
 
           {buildingHere && <p className="modal-note">{world.buildings[buildingHere.type]?.icon} {world.buildings[buildingHere.type]?.name}</p>}
 
@@ -657,11 +696,14 @@ export default function App() {
               })}
 
               <h4>Plant {!hasShed && '(needs Shed)'}</h4>
-              {hasCabin && hasShed && Object.values(world.crops).map((c) => (
-                <button key={c.id} className="crop-option" onClick={() => handlePlant(here.x, here.y, c.id)}>
-                  {c.icon} {c.name} — grows {Math.round(c.growTimeMs / 1000)}s, yields {c.yieldAmount}
-                </button>
-              ))}
+              {hasCabin && hasShed && Object.values(world.crops).map((c) => {
+                const affordable = (state.inventory.coin ?? 0) >= c.plantCost;
+                return (
+                  <button key={c.id} className="crop-option" disabled={!affordable} onClick={() => handlePlant(here.x, here.y, c.id)}>
+                    {c.icon} {c.name} — {c.plantCost} <ItemIcon item="coin" /> — grows {Math.round(c.growTimeMs / 1000)}s, yields {c.yieldAmount}
+                  </button>
+                );
+              })}
 
               <h4>Livestock {!hasBarn && '(needs Barn)'}</h4>
               {hasCabin && hasBarn && Object.values(world.livestock).map((l) => {
@@ -782,12 +824,34 @@ export default function App() {
                 {tier.label} homestead ({claimConfirmPlot.size}x{claimConfirmPlot.size}) — {tier.cost} coins
               </p>
               <p className="warning-note">
-                ⚠️ Homesteads can NEVER be sold, refunded, or exchanged once purchased. This is permanent.
+                ⚠️ You can sell this homestead later for {Math.round(tier.cost * world.homesteadSellRefundRate)} coins ({Math.round(world.homesteadSellRefundRate * 100)}% refund), but you'll lose everything built on it — buildings, crops, and livestock are gone permanently, with no resources refunded.
               </p>
               <button className="sell-option" onClick={() => handleClaim(claimConfirmPlot.id)}>
                 Confirm purchase
               </button>
               <button className="cancel" onClick={() => setClaimConfirmPlot(null)}>Cancel</button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {sellConfirmPlot && (() => {
+        const tier = world.homesteadTiers[sellConfirmPlot.size];
+        const refund = Math.round(tier.cost * world.homesteadSellRefundRate);
+        return (
+          <div className="modal-backdrop" onClick={() => setSellConfirmPlot(null)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <h3>Sell this homestead?</h3>
+              <p className="modal-note">
+                {tier.label} homestead ({sellConfirmPlot.size}x{sellConfirmPlot.size}) — you'll receive {refund} coins ({Math.round(world.homesteadSellRefundRate * 100)}% of the original price)
+              </p>
+              <p className="warning-note">
+                ⚠️ All buildings, crops, and livestock on this homestead will be permanently lost. None of the resources you spent building them will be refunded.
+              </p>
+              <button className="sell-option" onClick={() => handleSellPlot(sellConfirmPlot.id)}>
+                Confirm sale
+              </button>
+              <button className="cancel" onClick={() => setSellConfirmPlot(null)}>Cancel</button>
             </div>
           </div>
         );
