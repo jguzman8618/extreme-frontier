@@ -19,6 +19,10 @@ function itemIconFor(item: string, world: WorldConfig | null): string {
   if (world?.crops[item]) return world.crops[item].icon;
   if (world?.craftRecipes[item]) return world.craftRecipes[item].icon;
   if (world?.materialIcons[item]) return world.materialIcons[item];
+  if (world?.craftRecipes) {
+    const recipe = Object.values(world.craftRecipes).find((r) => (r.outputItem ?? r.id) === item);
+    if (recipe) return recipe.icon;
+  }
   return '📦';
 }
 
@@ -783,7 +787,7 @@ export default function App() {
                       {r.icon} {r.name}{r.damage != null && ` — ⚔️${r.damage}`}
                       <span className="option-sub">
                         {Object.entries(r.inputs).map(([i, q]) => `${q} ${i}`).join(', ')} → {r.outputQty}x, {Math.round(r.craftTimeMs / 1000)}s
-                        {state.shopPrices[r.id] && ` · sells ${state.shopPrices[r.id]}`}
+                        {state.shopPrices[r.outputItem ?? r.id] && ` · sells ${state.shopPrices[r.outputItem ?? r.id]}`}
                       </span>
                     </button>
                   ))}

@@ -672,7 +672,7 @@ app.post('/api/craft/collect', authMiddleware, (req: Request, res: Response) => 
   if (!recipe || Date.now() - job.started_at < recipe.craftTimeMs) return res.status(400).json({ error: 'not ready yet' });
 
   const tx = db.transaction(() => {
-    addItem(player.id, recipe.id, recipe.outputQty);
+    addItem(player.id, recipe.outputItem ?? recipe.id, recipe.outputQty);
     db.prepare('DELETE FROM crafting_jobs WHERE player_id = ?').run(player.id);
   });
   tx();

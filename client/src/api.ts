@@ -81,6 +81,7 @@ export interface CraftRecipeConfig {
   damage?: number;
   inputs: Record<string, number>;
   outputQty: number;
+  outputItem?: string;
   craftTimeMs: number;
 }
 
