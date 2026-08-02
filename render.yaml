@@ -10,3 +10,9 @@ services:
         value: 20
       - key: DATABASE_URL
         sync: false
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_CLIENT_SECRET
+        sync: false
+      - key: VITE_DISCORD_CLIENT_ID
+        sync: false

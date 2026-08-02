@@ -1,38 +1,45 @@
 # Extreme Frontier
 
-A persistent, multiplayer old-west homestead sim, meant to run as a
-Discord Activity. Walk a shared map, gather wood and stone, claim a
-homestead plot, build structures on it, farm crops, and barter goods
-directly with other players — no money anywhere, pure trade.
+A single-player, first-person 3D survival game, meant to run as a
+Discord Activity. Ten years after a nuclear event — radiation's long
+gone, but nothing ever got rebuilt. You're a lone survivor stepping
+back out into a quiet, overgrown world to build a life again.
+
+This repo previously held an old-west multiplayer homestead/barter
+sim under the same name. That project is paused; this is a fresh
+game built on the same Discord Activity shell (auth, server, deploy).
 
 ## What's actually working right now
 
-- **Shared live map** (20x20) — every player moves on the same world,
-  in real time, over sockets. You see other players walking around.
-- **Gathering** — trees (wood) and rocks (stone) scattered around the
-  map, walk up and gather, each node has a respawn cooldown.
-- **Homesteading** — 6 fixed 3x3 plots on the map. Walk onto an
-  unclaimed one and claim it (free).
-- **Building** — on your own plot, build a Cabin, Barn, Fence, or Well,
-  each costing wood/stone.
-- **Farming** — plant wheat/corn/potato on your own plot's open tiles,
-  wait for it to grow, harvest for goods (free to plant, just takes
-  time and land).
-- **Barter trading** — walk next to another player, send a trade
-  request, both sides offer goods from inventory, both confirm, and
-  the swap happens atomically server-side. No currency at all.
+- **First-person 3D world** — Three.js engine: rolling procedurally-
+  textured terrain, gatherable trees/rocks/berry bushes, ponds,
+  a day/night cycle, PBR materials, post-processing (bloom, filmic
+  grade, vignette, grain), and instanced swaying grass.
+- **Survival loop** — health, hunger, thirst, stamina, and warmth,
+  each with real consequences. Gather wood/stone/fiber/berries,
+  hunt wolves for meat, drink from ponds, craft a campfire/spear/
+  torch, cook food, survive the night.
+- **Wolves** — spawn more at night, chase and attack; craft a spear
+  to fight back and harvest meat from kills.
 - Dev username login (stand-in for real Discord identity) and full
   Discord Activity OAuth wiring, same pattern as before.
+- A simple per-player save endpoint (one JSON blob per player,
+  stored in Postgres) — not yet wired up on the client side.
 
 ## What's NOT here yet
 
-- Real hand-drawn art (current visuals are emoji icons on a colored
-  grid — a real visual pass is a separate next step)
-- More building types, crop varieties, or resource types
-- Any progression/skill system
-- Persistent database (still SQLite on Render's free tier, which
-  resets on every redeploy — worth fixing before showing this to
-  other people for real)
+- Real 3D character models — the player is a floating camera (no
+  visible body), and the wolf is built from primitive shapes rather
+  than a rigged model. Adding real glTF character models (rigged,
+  animated) is the next major piece.
+- Any story/quest content
+- Building, farming, and water-collection systems beyond the basic
+  campfire
+- Looter NPCs / defending your base
+- The planned later-game settlement system (recruiting survivors,
+  assigning jobs, logistics)
+- Client-side wiring to actually call the save/load endpoint (saves
+  aren't persisted between sessions yet)
 
 ## Running it locally
 
@@ -52,13 +59,14 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`. Move with arrow keys or WASD. Open a
-second browser profile/incognito window with a different username to
-test movement sync and trading between two players.
+Open `http://localhost:5173`. Click "Enter the Woods" to lock the
+mouse and play. WASD to move, Shift to sprint, Space to jump, E to
+gather/drink/interact, F to attack, C for the crafting menu.
 
 ## Deploying
 
-Same as before: push to GitHub, connect to Render (or similar), set
-`DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, and
-`VITE_DISCORD_CLIENT_ID` as environment variables, deploy. `render.yaml`
-is included as a blueprint.
+Push to GitHub, connect to Render (or similar), set
+`DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `VITE_DISCORD_CLIENT_ID`,
+and `DATABASE_URL` (a Postgres connection string, e.g. from Neon) as
+environment variables, deploy. `render.yaml` is included as a
+blueprint and will prompt for all four.
