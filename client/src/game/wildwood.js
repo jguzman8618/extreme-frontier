@@ -1060,10 +1060,19 @@ const recipeList = document.getElementById('recipeList');
 function toggleCraft(){
   if(!player.alive) return;
   const show = craftMenu.style.display !== 'flex';
-  craftMenu.style.display = show?'flex':'none';
-  if(show){ document.exitPointerLock(); renderRecipes(); }
+  if(show){
+    craftMenu.style.display = 'flex';
+    document.exitPointerLock();
+    renderRecipes();
+  } else {
+    closeCraftMenu();
+  }
 }
-document.getElementById('closeCraft').addEventListener('click', ()=>{ craftMenu.style.display='none'; });
+function closeCraftMenu(){
+  craftMenu.style.display = 'none';
+  if(player.alive) renderer.domElement.requestPointerLock();
+}
+document.getElementById('closeCraft').addEventListener('click', closeCraftMenu, {signal: abortCtrl.signal});
 
 function renderRecipes(){
   recipeList.innerHTML='';
@@ -1358,7 +1367,7 @@ animate();
 
 /* ============ ESC to release / craft close ============ */
 window.addEventListener('keydown',(e)=>{
-  if(e.code==='Escape'){ craftMenu.style.display='none'; }
+  if(e.code==='Escape' && craftMenu.style.display==='flex'){ closeCraftMenu(); }
 }, {signal: abortCtrl.signal});
 
 showMsg('Gather wood and stone. Build a fire before nightfall.');
