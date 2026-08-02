@@ -74,9 +74,9 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 800);
 const renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'});
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(1);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
@@ -168,8 +168,8 @@ leafTexture.wrapS = leafTexture.wrapT = THREE.RepeatWrapping;
 leafTexture.repeat.set(2,2);
 
 /* ============ INSTANCED GRASS (dense field around player) ============ */
-const GRASS_COUNT = 2400;
-const GRASS_RADIUS = 20;
+const GRASS_COUNT = 1100;
+const GRASS_RADIUS = 16;
 const bladeGeo = new THREE.PlaneGeometry(0.05, 0.4, 1, 3);
 bladeGeo.translate(0, 0.2, 0);
 const grassMat = new THREE.ShaderMaterial({
@@ -259,7 +259,7 @@ const bloomRT = new THREE.WebGLRenderTarget(4,4, rtParams);
 function resizePostTargets(){
   const full = rtDims(1);
   sceneRT.setSize(full.w, full.h);
-  const half = rtDims(0.5);
+  const half = rtDims(0.28);
   bloomRT.setSize(half.w, half.h);
 }
 resizePostTargets();
@@ -453,10 +453,10 @@ const hemi = new THREE.HemisphereLight(0xbdd8ea, 0x33421f, 1.1);
 scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff2d6, 1.6);
 sun.castShadow = true;
-sun.shadow.mapSize.set(1024,1024);
-sun.shadow.camera.left = -80; sun.shadow.camera.right = 80;
-sun.shadow.camera.top = 80; sun.shadow.camera.bottom = -80;
-sun.shadow.camera.far = 300;
+sun.shadow.mapSize.set(512,512);
+sun.shadow.camera.left = -45; sun.shadow.camera.right = 45;
+sun.shadow.camera.top = 45; sun.shadow.camera.bottom = -45;
+sun.shadow.camera.far = 200;
 scene.add(sun);
 scene.add(sun.target);
 const moonAmbient = new THREE.AmbientLight(0x1a2440, 0.15);
@@ -584,7 +584,7 @@ const bushLeafMat = new THREE.MeshStandardMaterial({map:leafTexture, color:0x3f6
 const ponds = [makePond(18,-30,9), makePond(-60,40,7)];
 if(pondPebbleParts.length){
   const pebbleMesh = mergeMeshesToOne(pondPebbleParts);
-  pebbleMesh.castShadow = true; pebbleMesh.receiveShadow = true;
+  pebbleMesh.castShadow = false; pebbleMesh.receiveShadow = true;
   scene.add(pebbleMesh);
 }
 
@@ -640,14 +640,14 @@ function makeRock(x,z){
   rock.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);
   const y = groundHeightAt(x,z);
   rock.position.set(x,y+s*0.3,z);
-  rock.castShadow = true; rock.receiveShadow = true;
+  rock.castShadow = false; rock.receiveShadow = true;
   rock.updateMatrix();
 
   // one small satellite pebble, merged in
   const pebble = new THREE.Mesh(new THREE.DodecahedronGeometry(s*0.28,0), rockMat);
   const a = Math.random()*Math.PI*2;
   pebble.position.set(x+Math.cos(a)*s*0.9, y+s*0.12, z+Math.sin(a)*s*0.9);
-  pebble.castShadow = true; pebble.receiveShadow = true;
+  pebble.castShadow = false; pebble.receiveShadow = true;
   pebble.updateMatrix();
 
   const merged = mergeMeshesToOne([rock, pebble]);
@@ -665,7 +665,7 @@ function makeBush(x,z){
     const s = 0.35+Math.random()*0.25;
     const lobe = new THREE.Mesh(new THREE.IcosahedronGeometry(s,0), bushLeafMat);
     lobe.position.set((Math.random()-0.5)*0.5, 0.25+Math.random()*0.2, (Math.random()-0.5)*0.5);
-    lobe.castShadow = true;
+    lobe.castShadow = false;
     lobe.updateMatrix();
     lobeParts.push(lobe);
   }
@@ -701,9 +701,9 @@ function randPos(minR){
   return [x,z];
 }
 
-for(let i=0;i<90;i++){ const [x,z]=randPos(6); makeTree(x,z); }
-for(let i=0;i<38;i++){ const [x,z]=randPos(6); makeRock(x,z); }
-for(let i=0;i<28;i++){ const [x,z]=randPos(4); makeBush(x,z); }
+for(let i=0;i<65;i++){ const [x,z]=randPos(6); makeTree(x,z); }
+for(let i=0;i<28;i++){ const [x,z]=randPos(6); makeRock(x,z); }
+for(let i=0;i<20;i++){ const [x,z]=randPos(4); makeBush(x,z); }
 
 // batch every contact shadow blob into a single draw call
 if(contactShadowParts.length){
